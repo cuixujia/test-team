@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // 默认主 Agent 为测试经理（编排角色）。
+  // 三个 Agent 的完整定义（含权限）全部在 .opencode/agents/*.md 中。
+  // 注意：此处不要重复声明 agents 块——JSONC 的 agents 定义会覆盖 Markdown 的 system 正文，
+  //       且权限规则依赖 Markdown 中的顺序（先 deny 兜底 → 再逐项 allow 例外）。
+  "default_agent": "test-manager",
+
+  "experimental": {
+    "todos": true
+  }
+}
