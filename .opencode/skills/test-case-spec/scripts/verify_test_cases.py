@@ -160,6 +160,25 @@ def load_prd_texts(prd_dir):
     return "".join(blob), skipped
 
 
+def load_file_texts(prd_dir):
+    """按文件名建立 {basename: 规范化文本} 映射（供标签命中精确到指定 PRD 文件）。"""
+    files = {}
+    for root, _dirs, fnames in os.walk(prd_dir):
+        for fn in sorted(fnames):
+            if fn.startswith("."):
+                continue
+            if not fn.lower().endswith(PRD_EXTS):
+                continue
+            path = os.path.join(root, fn)
+            try:
+                t = read_any_text(path)
+            except Exception:
+                continue
+            if t is not None:
+                files[fn] = norm(t)
+    return files
+
+
 
 def parse_first_table(text):
     """返回 (表头行, 数据行列表)——取文档中第一张表。
@@ -335,12 +354,35 @@ def main():
     if not any("标签" in m for m in FAILS):
         ok("标签结构校验通过")
 
-    # 6b) 标签取值须逐字命中 PRD
+    # 6b) 标签取值须逐字命中 PRD —— 命中范围限定为任务功能清单「来源PRD文件」列锁定的 PRD，
+    #     防止标签值只出现在开发设计文档等其他文件中也被判命中
     if args.prd_dir and os.path.isdir(args.prd_dir):
-        blob, skipped = load_prd_texts(args.prd_dir)
-        for fn in skipped:
-            warn(f"PRD 文件无法解析，标签命中未覆盖该文件: {fn}")
-        if blob:
+        files_map = load_file_texts(args.prd_dir)
+        prd_files = set()
+        if args.scope_list and os.path.isfile(args.scope_list):
+            st0 = read_text(args.scope_list)
+            _sh0, srows0 = parse_first_table(st0)
+            for row in srows0:
+                if row and len(row) > 2 and row[2]:
+                    prd_files.add(os.path.basename(row[2].strip()))
+        scoped_note = ""
+        if prd_files:
+            whitelist = [files_map[f] for f in sorted(prd_files) if f in files_map]
+            if whitelist:
+                blob = "".join(whitelist)
+                scoped_note = "（按任务功能清单锁定的 PRD 文件比对）"
+            else:
+                blob, _sk = load_prd_texts(args.prd_dir)
+                warn("标签命中范围收窄失败：任务功能清单指向的 PRD 文件均无法解析，退回全目录比对")
+            for fn in sorted(prd_files - set(files_map)):
+                warn(f"任务功能清单设定的 PRD 文件「{fn}」无法解析，标签命中未纳入该文件")
+        else:
+            blob, _sk = load_prd_texts(args.prd_dir)
+            for fn in _sk:
+                warn(f"PRD 文件无法解析，标签命中未覆盖该文件: {fn}")
+        if not blob:
+            warn("PRD 目录下无可解析文本，标签取值命中校验跳过")
+        else:
             nothit = []
             for r in main_rows:
                 lab = r[9] if len(r) > 9 else ""
@@ -354,7 +396,7 @@ def main():
             if nothit:
                 fail(f"标签取值未逐字命中 PRD 原文: {' '.join(nothit)}")
             else:
-                ok("标签取值逐字命中 PRD 校验通过")
+                ok("标签取值逐字命中 PRD 校验通过" + scoped_note)
     else:
         print("[WARN] 未提供 --prd-dir，跳过标签取值命中校验")
 

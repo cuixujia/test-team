@@ -5,7 +5,7 @@
   1. 编号格式 TP-NNN、唯一、连续
   2. 验证意图以「验证」开头
   3. 必填字段非空（验证意图/类型/分析方法/依据）
-  4. 依据锚点分类校验：
+  4. 依据锚点分类校验（锚点ID 必须是依据列行首第一个 token）：
      - 澄清锚点（CL-xxx）→ 必须存在于澄清记录（--clarifications，未提供而引用即 FAIL，杜绝悬空与静默跳过）
      - PRD 锚点 → 必须存在于锚点底册（--ledger）
   5. PRD 锚点的摘录必须与底册登记摘录逐字一致（空白规范化后包含比对，防改写/漂移）
@@ -141,18 +141,20 @@ def parse_first_table(text):
     return header, rows_all
 
 
-# 依据列锚点识别：CL- 前缀优先（避免被通用编号规则吞掉）
-ANCHOR_RE = re.compile(r"(CL-\d+|M\d+-S\d+-P\d+|[A-Z]{2,5}(?:-[A-Z]{2,5})?-\d{1,5}|\d+(?:\.\d+)+)")
+# 依据列锚点识别：CL- 前缀优先（避免被通用编号规则吞掉）；
+# 只认依据列**行首**的第一个 token——防止摘录正文里的“3.5”“2026.10”这类文本被误认成锚点
+ANCHOR_RE = re.compile(r"^\s*(CL-\d+|M\d+-S\d+-P\d+|[A-Z]{2,5}(?:-[A-Z]{2,5})?-\d{1,5}|\d+(?:\.\d+)+)")
 
 
 def first_anchor(cell):
-    """取依据列第一个合法锚点 token；TP/TC 编号不算锚点。"""
-    for m in ANCHOR_RE.finditer(cell):
-        t = m.group(1)
-        if re.fullmatch(r"(TP|TC)-\d{3}", t):
-            continue
-        return t
-    return None
+    """取依据列行首的锚点 token；行首不是锚点即视为缺锚（TP/TC 编号不算锚点）。"""
+    m = ANCHOR_RE.match(cell)
+    if not m:
+        return None
+    t = m.group(1)
+    if re.fullmatch(r"(TP|TC)-\d{3}", t):
+        return None
+    return t
 
 
 def main():
@@ -252,7 +254,7 @@ def main():
             continue
         tok = first_anchor(cell)
         if tok is None:
-            fail(f"依据缺锚点ID: {r[0]}")
+            fail(f"依据未以锚点ID开头(锚点必须是依据列第一个 token): {r[0]}")
             continue
         if tok.startswith("CL-"):
             used_cl.add(tok)

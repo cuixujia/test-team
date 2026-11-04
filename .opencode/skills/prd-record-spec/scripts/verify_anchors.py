@@ -5,10 +5,12 @@
   1. 底册存在，锚点清单表可解析
   2. 锚点ID 唯一
   3. 原文摘录 ≤40 字
-  4. 原文摘录真实存在于来源 PRD 文件（逐字命中，空白规范化后比对）
+  4. 原文摘录真实存在于「来源PRD文件」列指向的 PRD 文件（逐字命中，空白规范化后比对；
+     该列无法对应具体文件时退回全目录拼接文本比对并输出 WARN）
   5. 摘录连续、不跨段拼接（摘录内不得含连续两个换行）
   6. 关联功能编号在任务功能清单内
   7. 底册锚点是否已全部出现在测试点覆盖对照表中（可选，传 --tp-file）
+  8. 弱校验：底册含「## 段落账」章节（供阶段 3 漏锚抽查降耗，缺省仅 WARN 不拦截）
 
 用法：
   python3 verify_anchors.py <底册路径> [--prd-dir <PRD目录>] [--scope-list <任务功能清单>] [--tp-file <测试点清单>]
@@ -25,6 +27,23 @@ MAX_EXCERPT = 40
 FAILS = []
 WARNS = []
 PASSES = []
+
+
+def load_file_texts(prd_dir):
+    """按文件名建立 {basename: 规范化文本} 映射（供摘录精确到来源文件比对）。"""
+    files = {}
+    for root, _dirs, fnames in os.walk(prd_dir):
+        for fn in sorted(fnames):
+            if fn.startswith(".") or not fn.lower().endswith(PRD_EXTS):
+                continue
+            path = os.path.join(root, fn)
+            try:
+                t = read_any_text(path)
+            except Exception:
+                continue
+            if t is not None:
+                files[fn] = norm(t)
+    return files
 
 
 def fail(msg):
@@ -75,6 +94,37 @@ def parse_md_table(text: str, section_keyword: str):
             continue  # 分隔行
         rows.append(cells)
     return rows
+
+
+def parse_first_table(text):
+    """返回 (表头行, 数据行列表)——取文档中第一张表。
+
+    兼容两种写法：
+      A. 表在某个 ## 章节下 → 取该章节的第一张表
+      B. 表直接跟在 H1 下（无 ## 章节）→ 取全文第一张表
+    """
+    header = None
+    rows = []
+    seen_section = False
+    for line in text.split("\n"):
+        if line.startswith("##"):
+            if seen_section:
+                break
+            seen_section = True
+            continue
+        if not seen_section and line.startswith("#"):
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if all(re.fullmatch(r"[-: ]*", c) for c in cells):
+            continue  # 分隔行
+        if header is None:
+            header = cells
+            continue
+        rows.append(cells)
+    return header, rows
 
 
 def read_text(path: str) -> str:
@@ -134,25 +184,9 @@ def _doc_text(path):
 
 
 def load_prd_texts(prd_dir):
-    """返回 (规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。"""
-    blob, skipped = [], []
-    for root, _dirs, files in os.walk(prd_dir):
-        for fn in sorted(files):
-            if fn.startswith("."):
-                continue
-            if not fn.lower().endswith(PRD_EXTS):
-                continue
-            path = os.path.join(root, fn)
-            try:
-                t = read_any_text(path)
-            except Exception:
-                skipped.append(fn)
-                continue
-            if t is None:
-                skipped.append(fn)
-                continue
-            blob.append(norm(t))
-    return "".join(blob), skipped
+    """（兼容保留）返回 (规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。"""
+    files = load_file_texts(prd_dir)
+    return "".join(files.values()), []
 
 
 
@@ -213,39 +247,60 @@ def main():
         elif "\n" in r[3]:
             fail(f"锚点 {r[0]} 摘录跨段拼接（摘录内含换行）")
 
-    # 4) 摘录逐字命中 PRD
+    # 4) 摘录逐字命中 PRD —— 精确到锚点行「来源PRD文件」列的文件比对，
+    #    防止摘录只出现在其他文档（如开发设计文档）里也被判命中
     if degraded:
         warn("底册已声明摘录机验跳过，逐字命中校验跳过")
     elif not args.prd_dir:
         warn("未提供 --prd-dir，逐字命中校验跳过")
     else:
-        blob, skipped = load_prd_texts(args.prd_dir)
-        for fn in skipped:
-            warn(f"PRD 文件无法解析，摘录命中未覆盖该文件: {fn}")
-        if not blob:
+        files = load_file_texts(args.prd_dir)
+        if not files:
             fail("PRD 目录下无可解析的文本文件，无法机验摘录")
         else:
             miss = []
+            fallback_rows = []
             for r in rows:
-                if r[3] and norm(r[3]) not in blob:
+                if not r[3]:
+                    continue
+                fname = (r[1] or "").strip() if len(r) > 1 else ""
+                target = files.get(fname)
+                if target is None:
+                    # 来源PRD文件无法对应到具体文件：退回全目录拼接文本，并提示
+                    fallback_rows.append(r[0])
+                    target = "".join(files.values())
+                if norm(r[3]) not in target:
                     miss.append(r[0])
             if miss:
                 fail(f"原文摘录未逐字命中 PRD 原文: {' '.join(miss)}")
             else:
-                ok("原文摘录逐字命中 PRD 原文校验通过")
+                ok("原文摘录逐字命中 PRD 原文校验通过（按来源文件比对）")
+            if fallback_rows:
+                warn(f"摘录命中退回全目录比对（底册「来源PRD文件」列无法对应到具体文件）: "
+                     f"{len(fallback_rows)} 条锚点 {sorted(set(fallback_rows))}")
 
-    # 5) 关联功能编号在任务功能清单内
+    # 5) 关联功能编号在任务功能清单内（按任务功能清单第一张表解析，未再依赖章节标题关键字）
     if args.scope_list and os.path.isfile(args.scope_list):
         sl = read_text(args.scope_list)
-        frows = parse_md_table(sl, "功能清单")
+        _fh, frows = parse_first_table(sl)
         codes = {r[0] for r in frows if r and r[0] != "业务功能编号" and r[0]}
-        bad = [f"{r[0]}→{r[4]}" for r in rows if len(r) > 4 and r[4] and r[4] not in codes]
-        if bad:
-            fail(f"关联功能编号不在任务功能清单内: {' '.join(bad)}")
+        if not codes:
+            warn("任务功能清单未解析出功能编号，关联校验按空清单跳过")
         else:
-            ok("关联功能编号在任务功能清单内校验通过")
+            bad = [f"{r[0]}→{r[4]}" for r in rows if len(r) > 4 and r[4] and r[4] not in codes]
+            if bad:
+                fail(f"关联功能编号不在任务功能清单内: {' '.join(bad)}")
+            else:
+                ok("关联功能编号在任务功能清单内校验通过")
     else:
         warn("未提供 --scope-list，功能编号关联校验跳过")
+
+    # 5b) 段落账提示（弱校验：不拦截，仅供阶段 3 漏锚抽查降耗）
+    if "## 段落账" not in text:
+        warn("底册缺少「## 段落账」章节——建议随底册逐段登记处置（已建锚/范围外/待确认），"
+             "阶段 3 漏锚扫描可据此抽查而不必全文重读")
+    else:
+        ok("底册含段落账章节，阶段 3 漏锚抽查可据此降耗")
 
     # 6) 底册锚点是否被测试点覆盖对照表全覆盖
     if args.tp_file and os.path.isfile(args.tp_file):
