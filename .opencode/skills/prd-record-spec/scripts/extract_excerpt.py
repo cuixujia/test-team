@@ -6,23 +6,20 @@
 
 用法：
   # 按章节定位提取
-  python3 extract_excerpt.py --prd-dir <PRD目录> --locate "4.3.1"
-
-  # 按锚点定位（从底册中已登记的锚点读取其章节定位）
-  python3 extract_excerpt.py --prd-dir <PRD目录> --ledger <底册路径> --anchor "4.3.1"
+  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1"
 
   # 批量提取（一次调用取多个定位串，N 条锚点不再 N 次调用）
-  python3 extract_excerpt.py --prd-dir <PRD目录> --locate-file <定位串清单.txt>
+  python3 extract_excerpt.py --prd-dir <资料目录> --locate-file <定位串清单.txt>
   #   定位串清单：每行一个定位串；空行与 # 开头的注释行跳过
 
   # 候选句模式：不止自动挑一句，而是一次给出 top-N 句候选供点名采用
-  python3 extract_excerpt.py --prd-dir <PRD目录> --locate "4.3.1" --candidates 3
+  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1" --candidates 3
 
   # 指定最大字数与截断策略
-  python3 extract_excerpt.py --prd-dir <PRD目录> --locate "4.3.1" --max-chars 40
+  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1" --max-chars 40
 
 退出码：0 = 提取成功；1 = 未找到或无法定位；2 = 用法错误
-说明：只做定位与截取，不改写、不拼接、不跨段。
+说明：只做定位与截取，不改写、不拼接、不跨段；资料为纯文本格式。
 """
 import os
 import re
@@ -40,49 +37,7 @@ def read_text(path):
     raise RuntimeError(f"无法解码: {path}")
 
 
-PRD_EXTS = (".md", ".markdown", ".txt", ".docx", ".doc")
-
-
-def read_any_text(path):
-    p = path.lower()
-    if p.endswith(".docx"):
-        return _docx_text(path)
-    if p.endswith(".doc"):
-        return _doc_text(path)
-    return read_text(path)
-
-
-def _docx_text(path):
-    """零依赖解析 docx：word/document.xml 段落 -> 行文本。"""
-    import zipfile
-    with zipfile.ZipFile(path) as z:
-        xml = z.read("word/document.xml").decode("utf-8", "ignore")
-    xml = xml.replace("</w:p>", "\n")
-    xml = re.sub(r"<w:tab[^>]*/>", " ", xml)
-    xml = re.sub(r"<w:br[^>]*/>", "\n", xml)
-    txt = re.sub(r"<[^>]+>", "", xml)
-    txt = (txt.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-              .replace("&quot;", '"').replace("&apos;", "'"))
-    return txt
-
-
-def _doc_text(path):
-    """doc(旧二进制) 经 macOS textutil 转换；写临时目录，不触碰输入。失败返回 None。"""
-    import subprocess
-    import tempfile
-    import shutil
-    tmpd = tempfile.mkdtemp(prefix="prdconv_")
-    try:
-        out = os.path.join(tmpd, "out.txt")
-        r = subprocess.run(["textutil", "-convert", "txt", "-output", out, path],
-                           capture_output=True, timeout=60)
-        if r.returncode == 0 and os.path.isfile(out):
-            return read_text(out)
-        return None
-    except Exception:
-        return None
-    finally:
-        shutil.rmtree(tmpd, ignore_errors=True)
+PRD_EXTS = (".md", ".markdown", ".txt", ".csv")
 
 
 def iter_prd_files(prd_dir):
@@ -161,8 +116,7 @@ def locate_in_text(text, locate):
                         return paras[para - 1]
                     break
 
-    # 5) 纯文本回退（docx/doc/txt 无 markdown 标题）：行首编号且行长 ≤60 视为标题行
-    #    已知限制：docx 标题为自动编号样式（提取后无编号文本）时可能无法定位，
+    # 5) 纯文本回退（txt/csv 无 markdown 标题）：行首编号且行长 ≤60 视为标题行
     #    此时按 prd-record-spec 以「> 摘录机验：跳过（原因）」登记降级。
     if target is None:
         def _num_of(line):
@@ -246,45 +200,67 @@ def pick_sentence(body, max_chars):
     return got[0] if got else None
 
 
-def _resolve_locate_from_ledger(prd_dir, args):
-    """按 --ledger/--anchor 解析定位串。返回 locate 串或 None（错误已打印）。"""
-    locate = args.locate
-    if args.anchor:
-        if not args.ledger or not os.path.isfile(args.ledger):
-            print("用法错误: --anchor 需配合 --ledger", file=sys.stderr)
-            return None
-        lt = read_text(args.ledger)
-        # 底册列序: 锚点ID | 来源PRD文件 | 章节定位 | 原文摘录 | 关联功能编号
-        in_sec = False
-        for line in lt.split("\n"):
-            if line.startswith("##"):
-                in_sec = "锚点清单" in line
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--prd-dir", default="", help="资料目录（纯文本：md/markdown/txt/csv）")
+    ap.add_argument("--locate", default="", help="章节定位串")
+    ap.add_argument("--locate-file", default="", help="批量模式：定位串清单文件（每行一个，空行与 # 注释跳过）")
+    ap.add_argument("--max-chars", type=int, default=40, help="最大字符数")
+    ap.add_argument("--candidates", type=int, default=1, help="每个定位串输出的候选句数量（默认 1）")
+    args = ap.parse_args()
+
+    if not os.path.isdir(args.prd_dir):
+        print(f"用法错误: 资料目录不存在 {args.prd_dir}", file=sys.stderr)
+        return 2
+    if args.locate_file and args.locate:
+        print("用法错误: --locate-file 为批量模式，不与 --locate 同用", file=sys.stderr)
+        return 2
+
+    # 批量模式：一次调用提取多个定位串
+    if args.locate_file:
+        if not os.path.isfile(args.locate_file):
+            print(f"用法错误: 定位串清单不存在 {args.locate_file}", file=sys.stderr)
+            return 2
+        locates = [
+            ln.strip() for ln in read_text(args.locate_file).split("\n")
+            if ln.strip() and not ln.strip().startswith("#")
+        ]
+        if not locates:
+            print("用法错误: 定位串清单为空", file=sys.stderr)
+            return 2
+        hits = 0
+        for i, locate in enumerate(locates, 1):
+            sents, source = _extract_one(args.prd_dir, locate, args.max_chars, max(1, args.candidates))
+            print(f"===== [{i}/{len(locates)}] {locate} =====")
+            if not sents:
+                print(f"# 未命中（在资料目录中无法定位: {locate}）")
                 continue
-            if not in_sec:
-                continue
-            s = line.strip()
-            if not s.startswith("|"):
-                continue
-            cells = [c.strip() for c in s.strip("|").split("|")]
-            if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-                continue
-            if cells and cells[0] == args.anchor:
-                locate = cells[2] if len(cells) > 2 else ""
-                break
-        if not locate:
-            print(f"未找到锚点: {args.anchor}", file=sys.stderr)
-            return None
-    if not locate:
-        print("用法错误: 需 --locate 或 --anchor 或 --locate-file", file=sys.stderr)
-        return None
-    return locate
+            hits += 1
+            _print_candidates(locate, source, sents)
+        if hits == 0:
+            print("批量提取完成：0 条命中", file=sys.stderr)
+            return 1
+        print(f"\n批量提取完成：{hits}/{len(locates)} 条命中")
+        return 0
+
+    # 单条模式（保持原行为）
+    if not args.locate:
+        print("用法错误: 需 --locate 或 --locate-file", file=sys.stderr)
+        return 2
+
+    sents, source = _extract_one(args.prd_dir, args.locate, args.max_chars, max(1, args.candidates))
+    if not sents:
+        print(f"未能在资料目录中定位: {args.locate}", file=sys.stderr)
+        return 1
+    _print_candidates(args.locate, source, sents)
+    return 0
 
 
 def _extract_one(prd_dir, locate, max_chars, topn):
     """对单个定位串执行提取。返回 (命中候选列表, 来源文件名)；未命中返回 ([], None)。"""
     for path in iter_prd_files(prd_dir):
         try:
-            text = read_any_text(path)
+            text = read_text(path)
         except Exception:
             continue
         body = locate_in_text(text, locate)
@@ -308,64 +284,6 @@ def _print_candidates(locate, source, sents):
         print(f"# 来源: {source}  定位: {locate}")
         print(f"# 字符数: {len(sent)}")
         print(sent)
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--prd-dir", required=True, help="PRD 文件目录")
-    ap.add_argument("--locate", default="", help="章节定位串")
-    ap.add_argument("--locate-file", default="", help="批量模式：定位串清单文件（每行一个，空行与 # 注释跳过）")
-    ap.add_argument("--ledger", default="", help="锚点底册路径（配合 --anchor 使用）")
-    ap.add_argument("--anchor", default="", help="锚点ID（从底册读取其章节定位）")
-    ap.add_argument("--max-chars", type=int, default=40, help="最大字符数")
-    ap.add_argument("--candidates", type=int, default=1, help="每个定位串输出的候选句数量（默认 1）")
-    args = ap.parse_args()
-
-    if not os.path.isdir(args.prd_dir):
-        print(f"用法错误: PRD 目录不存在 {args.prd_dir}", file=sys.stderr)
-        return 2
-    if args.locate_file and (args.locate or args.anchor or args.ledger):
-        print("用法错误: --locate-file 为批量模式，不与 --locate/--anchor/--ledger 同用", file=sys.stderr)
-        return 2
-
-    # 批量模式：一次调用提取多个定位串
-    if args.locate_file:
-        if not os.path.isfile(args.locate_file):
-            print(f"用法错误: 定位串清单不存在 {args.locate_file}", file=sys.stderr)
-            return 2
-        locates = [
-            ln.strip() for ln in read_text(args.locate_file).split("\n")
-            if ln.strip() and not ln.strip().startswith("#")
-        ]
-        if not locates:
-            print("用法错误: 定位串清单为空", file=sys.stderr)
-            return 2
-        hits = 0
-        for i, locate in enumerate(locates, 1):
-            sents, source = _extract_one(args.prd_dir, locate, args.max_chars, max(1, args.candidates))
-            print(f"===== [{i}/{len(locates)}] {locate} =====")
-            if not sents:
-                print(f"# 未命中（在 PRD 目录中无法定位: {locate}）")
-                continue
-            hits += 1
-            _print_candidates(locate, source, sents)
-        if hits == 0:
-            print("批量提取完成：0 条命中", file=sys.stderr)
-            return 1
-        print(f"\n批量提取完成：{hits}/{len(locates)} 条命中")
-        return 0
-
-    # 单条模式（保持原行为）
-    locate = _resolve_locate_from_ledger(args.prd_dir, args)
-    if locate is None:
-        return 2 if args.locate or args.anchor else 2
-
-    sents, source = _extract_one(args.prd_dir, locate, args.max_chars, max(1, args.candidates))
-    if not sents:
-        print(f"未能在 PRD 目录中定位: {locate}", file=sys.stderr)
-        return 1
-    _print_candidates(locate, source, sents)
-    return 0
 
 
 if __name__ == "__main__":

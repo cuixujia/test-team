@@ -92,68 +92,29 @@ def norm(s):
     return re.sub(r"[\s　]+", "", s)
 
 
-# ---- PRD 多格式读取：md/markdown/txt 直读；docx 用 stdlib 解包解析；doc 用 macOS textutil 转换 ----
-PRD_EXTS = (".md", ".markdown", ".txt", ".docx", ".doc")
+def split_tp_refs(value):
+    """首项为主要 TP，后续项为相关 TP；兼容原有单 TP 格式。"""
+    return [item.strip() for item in re.split(r"[,，、]", value) if item.strip()]
 
 
-def read_any_text(path):
-    p = path.lower()
-    if p.endswith(".docx"):
-        return _docx_text(path)
-    if p.endswith(".doc"):
-        return _doc_text(path)
-    return read_text(path)
-
-
-def _docx_text(path):
-    """零依赖解析 docx：word/document.xml 段落 -> 行文本。"""
-    import zipfile
-    with zipfile.ZipFile(path) as z:
-        xml = z.read("word/document.xml").decode("utf-8", "ignore")
-    xml = xml.replace("</w:p>", "\n")
-    xml = re.sub(r"<w:tab[^>]*/>", " ", xml)
-    xml = re.sub(r"<w:br[^>]*/>", "\n", xml)
-    txt = re.sub(r"<[^>]+>", "", xml)
-    txt = (txt.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-              .replace("&quot;", '"').replace("&apos;", "'"))
-    return txt
-
-
-def _doc_text(path):
-    """doc(旧二进制) 经 macOS textutil 转换；写临时目录，不触碰输入。失败返回 None。"""
-    import subprocess
-    import tempfile
-    import shutil
-    tmpd = tempfile.mkdtemp(prefix="prdconv_")
-    try:
-        out = os.path.join(tmpd, "out.txt")
-        r = subprocess.run(["textutil", "-convert", "txt", "-output", out, path],
-                           capture_output=True, timeout=60)
-        if r.returncode == 0 and os.path.isfile(out):
-            return read_text(out)
-        return None
-    except Exception:
-        return None
-    finally:
-        shutil.rmtree(tmpd, ignore_errors=True)
+# ---- 资料读取：纯文本（md/markdown/txt/csv），docx/图片等非文本件在入库仪式即拦截 ----
+PRD_EXTS = (".md", ".markdown", ".txt", ".csv")
 
 
 def load_prd_texts(prd_dir):
-    """返回 (规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。"""
+    """返回 (全部文件规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。"""
     blob, skipped = [], []
     for root, _dirs, files in os.walk(prd_dir):
         for fn in sorted(files):
             if fn.startswith("."):
                 continue
             if not fn.lower().endswith(PRD_EXTS):
+                skipped.append(fn)
                 continue
             path = os.path.join(root, fn)
             try:
-                t = read_any_text(path)
+                t = read_text(path)
             except Exception:
-                skipped.append(fn)
-                continue
-            if t is None:
                 skipped.append(fn)
                 continue
             blob.append(norm(t))
@@ -171,11 +132,10 @@ def load_file_texts(prd_dir):
                 continue
             path = os.path.join(root, fn)
             try:
-                t = read_any_text(path)
+                t = read_text(path)
             except Exception:
                 continue
-            if t is not None:
-                files[fn] = norm(t)
+            files[fn] = norm(t)
     return files
 
 
@@ -217,7 +177,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("tcfile", help="测试用例清单路径")
     ap.add_argument("--tp-file", default="", help="测试点清单路径")
-    ap.add_argument("--prd-dir", default="", help="PRD 文件所在目录")
+    ap.add_argument("--prd-dir", default="", help="资料目录（纯文本：md/markdown/txt/csv）")
     ap.add_argument("--scope-list", default="", help="任务功能清单路径")
     args = ap.parse_args()
 
@@ -282,16 +242,22 @@ def main():
         tt = read_text(args.tp_file)
         _h, trows = parse_first_table(tt)
         tps = {r[0] for r in trows if r and re.fullmatch(r"TP-\d{3}", r[0])}
+    tc_tp_map = {}
     if tps:
         badref = []
         for r in main_rows:
             ref = r[2] if len(r) > 2 else ""
-            if ref and ref not in tps:
-                badref.append(f"{r[0]}→{ref}")
+            refs = split_tp_refs(ref)
+            tc_tp_map[r[0]] = set(refs)
+            if not refs:
+                badref.append(f"{r[0]}→(缺少关联TP)")
+            for tp in refs:
+                if not re.fullmatch(r"TP-\d{3}", tp) or tp not in tps:
+                    badref.append(f"{r[0]}→{tp}")
         if badref:
-            fail(f"关联TP 不存在于测试点清单: {' '.join(badref)}")
+            fail(f"关联TP 格式错误或不存在于测试点清单: {' '.join(badref)}")
         else:
-            ok("关联TP 引用完整性校验通过")
+            ok("主测试点及相关测试点引用完整性校验通过")
     else:
         print("[WARN] 未提供 --tp-file 或测试点清单为空，跳过引用完整性校验")
 
@@ -304,6 +270,7 @@ def main():
         covered_tp = set()      # 被 TC 覆盖的 TP
         declared_exempt = set() # 声明了未覆盖原因的 TP
         all_tc_refs = set()     # 覆盖对照表中引用的 TC 编号
+        matrix_pairs = set()    # (TP, TC) 覆盖关系
         for r in crows:
             if len(r) < 3:
                 continue
@@ -312,6 +279,7 @@ def main():
                 continue
             tcs = [x.strip() for x in re.split(r"[,，、]", r[1]) if x.strip()]
             all_tc_refs |= {x for x in tcs if re.fullmatch(r"TC-\d{3}", x)}
+            matrix_pairs |= {(tp, tc) for tc in tcs if re.fullmatch(r"TC-\d{3}", tc)}
             if tcs:
                 covered_tp.add(tp)
             if r[2].strip() and r[2].strip() not in ("—", "-"):
@@ -331,6 +299,19 @@ def main():
         unregistered = sorted(tc_ids - all_tc_refs)
         if unregistered:
             fail(f"以下 TC 未在覆盖对照表中登记: {' '.join(unregistered)}")
+        expected_pairs = {
+            (tp, tc)
+            for tc, refs in tc_tp_map.items()
+            for tp in refs
+        }
+        missing_pairs = sorted(expected_pairs - matrix_pairs)
+        extra_pairs = sorted(matrix_pairs - expected_pairs)
+        if missing_pairs:
+            fail("测试点→用例对照表漏登记关联: " + " ".join(f"{tp}→{tc}" for tp, tc in missing_pairs))
+        if extra_pairs:
+            fail("测试点→用例对照表登记了用例中未声明的关联: " + " ".join(f"{tp}→{tc}" for tp, tc in extra_pairs))
+        if not missing_pairs and not extra_pairs:
+            ok("用例关联与测试点→用例对照表一致")
 
     # 6) 标签结构与取值
     for r in main_rows:
@@ -356,7 +337,7 @@ def main():
 
     # 6b) 标签取值须逐字命中 PRD —— 命中范围限定为任务功能清单「来源PRD文件」列锁定的 PRD，
     #     防止标签值只出现在开发设计文档等其他文件中也被判命中
-    if args.prd_dir and os.path.isdir(args.prd_dir):
+    if (args.prd_dir and os.path.isdir(args.prd_dir)):
         files_map = load_file_texts(args.prd_dir)
         prd_files = set()
         if args.scope_list and os.path.isfile(args.scope_list):

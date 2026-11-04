@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""verify_test_points.py — 测试点清单机械校验
+"""verify_test_points.py — 测试点清单机械校验（纯文本直引，V2 唯一流程）
 
 校验项：
   1. 编号格式 TP-NNN、唯一、连续
   2. 验证意图以「验证」开头
   3. 必填字段非空（验证意图/类型/分析方法/依据）
-  4. 依据锚点分类校验（锚点ID 必须是依据列行首第一个 token）：
-     - 澄清锚点（CL-xxx）→ 必须存在于澄清记录（--clarifications，未提供而引用即 FAIL，杜绝悬空与静默跳过）
-     - PRD 锚点 → 必须存在于锚点底册（--ledger）
-  5. PRD 锚点的摘录必须与底册登记摘录逐字一致（空白规范化后包含比对，防改写/漂移）
-  6. 覆盖对照表存在；底册锚点全覆盖；未覆盖须写明原因；CL 行可选、不参与底册覆盖核算
-  7. 交付物中不得出现业务功能编号
-  8. 输出 [SHA256] 行（交稿自证/收回核验共用同一指纹来源）
+  4. 依据证据项校验（每项必须是行首证据 token）：
+     - 直引证据：`文件名:L行号或区间「原话」` → 对原文件该行就地逐字校验（--input-dir 必填）
+     - 澄清证据：CL-xxx → 必须存在于澄清记录（--clarifications，未提供而引用即 FAIL）
+     - 其余写法（含旧锚点 ID）一律 FAIL，杜绝幻觉锚点
+  5. 覆盖对照表存在（证据→测试点）；已引用的 直引证据 必须上表；
+     未覆盖须写明原因；CL 行可选、不参与覆盖核算；表内证据必须真实被引用过
+  6. 交付物中不得出现业务功能编号
+  7. 输出 [SHA256] 行（交稿自证/收回核验共用同一指纹来源）
 
 用法：
-  python3 verify_test_points.py <测试点清单> [--ledger <锚点底册>] [--scope-list <任务功能清单>] [--clarifications <澄清记录>]
+  python3 verify_test_points.py <测试点清单> --input-dir <资料目录> [--scope-list <任务功能清单>] [--clarifications <澄清记录>]
 
 退出码：0 = 通过；1 = 存在 FAIL；2 = 用法错误
 """
@@ -65,6 +66,30 @@ def norm(s):
     return re.sub(r"\s+", "", s)
 
 
+def v2_quote_ok(input_dir, rel, lines_spec, quote, cache={}):
+    """直引校验：摘录在 指定文件指定行（区间连接）中空白规范化后逐字命中。"""
+    try:
+        if rel in cache:
+            lines = cache[rel]
+        else:
+            path = os.path.join(input_dir, rel)
+            if not os.path.isfile(path):
+                return False
+            with open(path, encoding="utf-8-sig") as stream:
+                lines = stream.read().splitlines()
+            cache[rel] = lines
+        m = re.fullmatch(r"(\d+)(?:\s*[-~]\s*(\d+))?", str(lines_spec).strip())
+        if not m:
+            return False
+        start, end = int(m.group(1)), int(m.group(2) or m.group(1))
+        if start < 1 or end < start or end > len(lines):
+            return False
+        haystack = norm("\n".join(lines[start - 1:end]))
+        return bool(quote) and norm(quote) in haystack
+    except OSError:
+        return False
+
+
 def parse_md_table(text, keyword):
     """返回 (表头行, 数据行列表)。
 
@@ -76,8 +101,11 @@ def parse_md_table(text, keyword):
         in_sec = False
         for line in text.split("\n"):
             if line.startswith("##"):
+                if in_sec:
+                    break
                 in_sec = keyword in line
-                header, rows = None, []
+                if in_sec:
+                    header, rows = None, []
                 continue
             if not in_sec:
                 continue
@@ -141,26 +169,37 @@ def parse_first_table(text):
     return header, rows_all
 
 
-# 依据列锚点识别：CL- 前缀优先（避免被通用编号规则吞掉）；
-# 只认依据列**行首**的第一个 token——防止摘录正文里的“3.5”“2026.10”这类文本被误认成锚点
-ANCHOR_RE = re.compile(r"^\s*(CL-\d+|M\d+-S\d+-P\d+|[A-Z]{2,5}(?:-[A-Z]{2,5})?-\d{1,5}|\d+(?:\.\d+)+)")
+# 直引证据（文件:行号+原话，唯一 PRD 证据格式，见 prd-record-spec/SKILL.md）
+V2_CITE_RE = re.compile(
+    r"^\s*([A-Za-z0-9_\-./\u4e00-\u9fff]+\.(?:md|markdown|txt|csv)):"
+    r"L(\d+(?:\s*[-~]\s*\d+)?)\s*「([^」]{1,300})」"
+)
 
 
-def first_anchor(cell):
-    """取依据列行首的锚点 token；行首不是锚点即视为缺锚（TP/TC 编号不算锚点）。"""
-    m = ANCHOR_RE.match(cell)
-    if not m:
-        return None
-    t = m.group(1)
-    if re.fullmatch(r"(TP|TC)-\d{3}", t):
-        return None
-    return t
+def evidence_anchor(segment):
+    """识别依据证据项的行首证据 token：
+    - 直引：返回 `文件:L行号`（并返回原始引用元组供逐字比对）
+    - 澄清：返回 CL-xxx
+    - 其余：None（含 TP/TC 编号与旧式锚点，均不允许）
+    """
+    m = V2_CITE_RE.match(segment)
+    if m:
+        return f"{m.group(1)}:L{m.group(2)}", (m.group(1), m.group(2), m.group(3))
+    m = re.match(r"^\s*(CL-\d+)\b", segment)
+    if m:
+        return m.group(1), None
+    return None, None
+
+
+def evidence_segments(cell):
+    """多条证据以保留分隔符 ⟂ 分隔。"""
+    return [part.strip() for part in re.split(r"\s*⟂\s*", cell) if part.strip()]
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("tpfile", help="测试点清单路径")
-    ap.add_argument("--ledger", default="", help="溯源锚点底册路径")
+    ap.add_argument("--input-dir", required=True, help="资料目录（直引证据就地逐字校验）")
     ap.add_argument("--scope-list", default="", help="任务功能清单路径")
     ap.add_argument("--clarifications", default="", help="澄清记录路径")
     args = ap.parse_args()
@@ -178,7 +217,7 @@ def main():
         return 1
 
     # 列序契约: 编号 | 验证意图 | 类型 | 分析方法 | 依据
-    if header != ["编号", "验证意图", "类型", "分析方法", "依据（锚点+原文摘录）"]:
+    if header != ["编号", "验证意图", "类型", "分析方法", "依据（文件:行号+原话）"]:
         print(f"[FAIL] 测试点清单列序不符合契约: {header}")
 
     # 1) 编号格式 / 唯一 / 连续
@@ -220,25 +259,9 @@ def main():
     else:
         ok("必填字段非空校验通过")
 
-    # 4) 依据锚点分类校验
-    #    - 澄清锚点 CL-xxx → 须存在于澄清记录（未提供文件即 FAIL，防悬空/静默跳过）
-    #    - PRD 锚点 → 须存在于底册，且摘录与底册登记逐字一致（空白规范化比对）
-    anchors = set()
-    excerpt_map = {}
-    if args.ledger:
-        if os.path.isfile(args.ledger):
-            lt = read_text(args.ledger)
-            _lh, lrows = parse_first_table(lt)
-            for row in lrows:
-                if not row:
-                    continue
-                aid = row[0]
-                if re.fullmatch(r"(M\d+-S\d+-P\d+|[A-Za-z]{2,5}(?:-[A-Za-z]{2,5})?-\d{1,5}|\d+(?:\.\d+)+)", aid):
-                    anchors.add(aid)
-                    excerpt_map[aid] = row[3] if len(row) > 3 else ""
-        else:
-            fail(f"底册不存在: {args.ledger}")
-
+    # 4) 依据证据项校验
+    #    - 直引证据 `文件:L行「原话」` → 对原文件指定行逐一比对
+    #    - 澄清证据 CL-xxx → 须存在于澄清记录（未提供文件即 FAIL）
     cl_ids = set()
     if args.clarifications:
         if os.path.isfile(args.clarifications):
@@ -246,76 +269,89 @@ def main():
             _ch, crows = parse_first_table(ct)
             cl_ids = {r[0] for r in crows if r and re.fullmatch(r"CL-\d+", r[0])}
 
-    used_prd, used_cl = set(), set()
-    missing_exitcode = False
+    cited = set()           # 被引用的 直引 token：file:Llines
+    used_cl = set()
     for r in main_rows:
         cell = r[4] if len(r) > 4 else ""
         if not cell:
             continue
-        tok = first_anchor(cell)
-        if tok is None:
-            fail(f"依据未以锚点ID开头(锚点必须是依据列第一个 token): {r[0]}")
+        segments = evidence_segments(cell)
+        if not segments:
+            fail(f"依据证据项缺失或格式非法: {r[0]}")
             continue
-        if tok.startswith("CL-"):
-            used_cl.add(tok)
-            if not args.clarifications:
-                fail(f"依据引用澄清锚点但未提供 --clarifications: {r[0]} ({tok})")
-                missing_exitcode = True
-            elif tok not in cl_ids:
-                fail(f"澄清锚点不在澄清记录中: {r[0]} ({tok})")
-        else:
-            used_prd.add(tok)
-            if not args.ledger:
-                fail(f"依据引用 PRD 锚点但未提供或无法读取 --ledger: {r[0]} ({tok})")
-                missing_exitcode = True
-            elif tok not in anchors:
-                fail(f"依据锚点不在底册内: {r[0]} ({tok})")
-            elif not excerpt_map.get(tok):
-                fail(f"底册该锚点无原文摘录: {r[0]} ({tok})")
-            elif norm(excerpt_map[tok]) not in norm(cell):
-                fail(f"依据摘录与底册登记不一致(须逐字引用): {r[0]} ({tok})")
-    if used_prd and anchors:
-        ok("依据锚点在底册内且摘录逐字一致校验通过")
-    if used_cl and args.clarifications and not missing_exitcode:
-        unkn = sorted(used_cl - cl_ids)
-        if not unkn:
-            ok("澄清锚点在澄清记录中存在性校验通过")
+        for segment in segments:
+            tok, cite = evidence_anchor(segment)
+            if tok is None:
+                fail(f"依据证据项未以 直引(文件:L行「原话」) 或 CL-xxx 开头: {r[0]} ({segment[:30]})")
+                continue
+            if tok.startswith("CL-"):
+                used_cl.add(tok)
+                if not args.clarifications:
+                    fail(f"依据引用澄清编号但未提供 --clarifications: {r[0]} ({tok})")
+                elif tok not in cl_ids:
+                    fail(f"澄清编号不在澄清记录中: {r[0]} ({tok})")
+                continue
+            cited.add(tok)
+            rel, spec, quote = cite
+            if not v2_quote_ok(args.input_dir, rel, spec, quote):
+                fail(f"直引摘录未在 {rel}:L{spec} 逐字命中: {r[0]} 「{quote[:30]}」")
 
-    # 5) 覆盖对照表存在 + 底册锚点全覆盖
-    ch, crows = parse_md_table(text, "覆盖对照表")
+    if cited and not any(m.startswith("直引摘录未在") for m in FAILS):
+        ok("直引证据逐字校验通过")
+    if used_cl and not any("澄清编号" in m for m in FAILS):
+        ok("澄清编号存在性校验通过")
+
+    # 5) 覆盖对照表（证据→测试点）：引用过的证据必须上表；表内证据必须真实被引用
+    ch, crows = parse_md_table(text, "证据→测试点")
     if not crows:
-        fail("缺少覆盖对照表章节或表内无有效行")
+        fail("缺少覆盖对照表章节（证据→测试点）或表内无有效行")
     else:
-        covered = {
-            r[0] for r in crows
-            if r and r[0] not in ("锚点ID", "PRD 锚点", "锚点") and not re.fullmatch(r"CL-\d+", r[0])
-        }
-        if anchors:
-            missing = sorted(anchors - covered)
-            if missing:
-                fail(f"底册锚点未出现在覆盖对照表: {' '.join(missing)}")
-            else:
-                ok("底册锚点在覆盖对照表全覆盖校验通过")
-        extra = sorted(covered - anchors) if anchors else []
+        covered = set()
+        bad_rows = []
+        for r in crows:
+            if len(r) < 3 or not r[0]:
+                continue
+            ev = r[0].strip()
+            m = re.fullmatch(r"([A-Za-z0-9_\-./\u4e00-\u9fff]+\.(?:md|markdown|txt|csv)):L(\d+(?:\s*[-~]\s*\d+)?)", ev)
+            if m:
+                covered.add(f"{m.group(1)}:L{m.group(2)}")
+                continue
+            if re.fullmatch(r"CL-\d+", ev) or ev in ("证据（文件:行号）", "文件:行号", "直引证据"):
+                continue
+            bad_rows.append(ev)
+        if bad_rows:
+            fail(f"覆盖对照表首列含非法证据标识(须 文件:L行 或 CL-xxx): {' | '.join(bad_rows[:5])}")
+        missing = sorted(cited - covered)
+        if missing:
+            fail(f"被引用的证据未出现在覆盖对照表: {' '.join(missing)}")
+        else:
+            ok("被引用证据在覆盖对照表全覆盖校验通过")
+        extra = sorted(covered - cited)
         if extra:
-            fail(f"覆盖对照表锚点不在底册内(疑似幻觉锚点): {' '.join(extra)}")
-        # 未覆盖项（即无 TP 的底册锚点）须写明原因；已覆盖项原因列应留空
+            fail(f"覆盖对照表登记了未被任何 TP 引用的证据(疑似幻覺证据): {' '.join(extra)}")
+        # 未覆盖项（无 TP 的证据行）须写明原因；已覆盖项原因列应留空
         noreason, hasreason = [], []
         for r in crows:
-            if len(r) < 3 or r[0] not in anchors:
+            if len(r) < 3:
+                continue
+            ev = r[0].strip()
+            if not re.fullmatch(r"([A-Za-z0-9_\-./\u4e00-\u9fff]+\.(?:md|markdown|txt|csv)):L\d+", ev):
                 continue
             tps = [x.strip() for x in re.split(r"[,，、]", r[1]) if x.strip()]
+            bad_tps = [tp for tp in tps if not re.fullmatch(r"TP-\d{3}", tp)]
+            if bad_tps:
+                fail(f"覆盖对照表含非法测试点编号: {ev} ({' '.join(bad_tps)})")
             reason = r[2].strip()
             if not tps and not reason:
-                noreason.append(r[0])
+                noreason.append(ev)
             if tps and reason:
-                hasreason.append(r[0])
+                hasreason.append(ev)
         if noreason:
-            fail(f"覆盖对照表中未覆盖的锚点未填写原因: {' '.join(noreason)}")
+            fail(f"覆盖对照表中未覆盖的证据未填写原因: {' '.join(noreason)}")
         else:
             ok("覆盖对照表未覆盖项原因声明校验通过")
         if hasreason:
-            warn(f"覆盖对照表中已覆盖的锚点填写了未覆盖原因: {' '.join(hasreason)}")
+            warn(f"覆盖对照表中已覆盖的证据填写了未覆盖原因: {' '.join(hasreason)}")
 
     # 6) 交付物不得出现业务功能编号
     if args.scope_list and os.path.isfile(args.scope_list):

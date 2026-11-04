@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 交付自检：权限断言 + 校验脚本正/负面回归 + 结构完整性
+# 交付自检：权限断言 + 纯文本直引校验工具正/负面回归 + 结构完整性
 set -u
 cd "$(dirname "$0")" || exit 1
 PASS=0; FAIL=0
@@ -9,9 +9,14 @@ ng(){ FAIL=$((FAIL+1)); printf '[FAIL] %s\n' "$1"; }
 W="workspace/runtime_demo/file"
 S="$W/sess-demo-0001"
 PRD="$W/project-docs"
-VA=".opencode/skills/prd-record-spec/scripts/verify_anchors.py"
+VQ=".opencode/skills/prd-record-spec/scripts/verify_quotes.py"
+VB=".opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py"
 VP=".opencode/skills/test-point-spec/scripts/verify_test_points.py"
 VC=".opencode/skills/test-case-spec/scripts/verify_test_cases.py"
+VT=".opencode/skills/test-point-spec/scripts/verify_traceability.py"
+BASE="$S/scope/requirements-baseline.json"
+TP="$S/output/tp/test-point.md"
+TC="$S/output/tc/test-case.md"
 
 echo "========== 1. Agent 定义完整性 =========="
 for a in test-manager test-designer test-qa-expert; do
@@ -34,158 +39,228 @@ grep -A2 'action: subagent' .opencode/agents/test-designer.md | grep -q 'deny' &
 # 单一写入者：只看 permissions 块（frontmatter），不看正文
 perm_block(){ sed -n '1,/^---$/p' "$1" | sed -n '2,/^---$/p'; }
 perm_block .opencode/agents/test-designer.md | grep -q 'output/reports' && ng "designer 被授予报告写权限" || ok "designer 无报告写权限"
+perm_block .opencode/agents/test-designer.md | grep -q 'anchors.md' && ng "designer 仍被授予锚点底册写权限" || ok "designer 无锚点底册写权限"
 perm_block .opencode/agents/test-qa-expert.md | grep -q 'output/tp\|output/tc' && ng "qa 被授予产物写权限" || ok "qa 无产物写权限"
-perm_block .opencode/agents/test-manager.md | grep -q 'output/tp\|output/tc\|output/reports' && ng "manager 被授予产物写权限" || ok "manager 无产物写权限"
+perm_block .opencode/agents/test-manager.md | grep -q 'output/tp\|output/tc\|output/reports\|source-catalog' && ng "manager 被授予产物/目录写权限" || ok "manager 无产物与资料目录写权限"
 
 echo
-echo "========== 3. Skill 与脚本完整性 =========="
+echo "========== 3. Skill 与脚本完整性（V2 唯一，无旧版遗留） =========="
 for s in prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec; do
   [ -f ".opencode/skills/$s/SKILL.md" ] && ok "skill $s" || ng "skill $s 缺失"
 done
-[ -f "$VA" ] && ok "verify_anchors.py" || ng "verify_anchors.py 缺失"
-[ -f "$VP" ] && ok "verify_test_points.py" || ng "verify_test_points.py 缺失"
-[ -f "$VC" ] && ok "verify_test_cases.py" || ng "verify_test_cases.py 缺失"
-[ -f ".opencode/skills/prd-record-spec/scripts/extract_excerpt.py" ] && ok "extract_excerpt.py" || ng "extract_excerpt.py 缺失"
+for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/validate_delivery.py .opencode/skills/test-point-spec/scripts/verify_validation_report.py; do
+  [ -f "$f" ] && ok "$(basename "$f")" || ng "$(basename "$f") 缺失"
+done
+for f in build_source_catalog.py verify_source_catalog.py verify_anchors.py; do
+  [ -f ".opencode/skills/prd-record-spec/scripts/$f" ] && ng "旧版脚本 $f 未退役" || ok "旧版脚本 $f 已退役"
+done
+grep -rq 'source_catalog_sha256\|--ledger\|--anchors' .opencode/skills/*/scripts/*.py && ng "脚本仍残留 V1 接口" || ok "脚本无 V1 接口残留"
 
 echo
 echo "========== 4. 校验脚本正面回归（应全部通过）=========="
-python3 "$VA" "$S/scope/anchors.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ok "verify_anchors 通过" || ng "verify_anchors 失败"
-python3 "$VP" "$S/output/tp/test-point.md" --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ok "verify_test_points 通过" || ng "verify_test_points 失败"
-python3 "$VC" "$S/output/tc/test-case.md" --tp-file "$S/output/tp/test-point.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ok "verify_test_cases 通过" || ng "verify_test_cases 失败"
+python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir "$PRD" --ids-only >/dev/null 2>&1 && ok "scan_outline 轻扫描通过" || ng "scan_outline 失败"
+python3 "$VQ" "$TP" --input-dir "$PRD" --extract-from >/dev/null 2>&1 && ok "verify_quotes 直接抽 TP 引用通过" || ng "verify_quotes TP 引用失败"
+python3 "$VB" "$BASE" --input-dir "$PRD" --clarifications "$S/state/clarifications.md" --freeze >/dev/null 2>&1 && ok "verify_requirement_baseline（直引+指纹+冻结）通过" || ng "verify_requirement_baseline 失败"
+python3 "$VP" "$TP" --input-dir "$PRD" --scope-list "$S/state/scope-list.md" --clarifications "$S/state/clarifications.md" >/dev/null 2>&1 && ok "verify_test_points 通过" || ng "verify_test_points 失败"
+python3 "$VC" "$TC" --tp-file "$TP" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ok "verify_test_cases 通过" || ng "verify_test_cases 失败"
+python3 "$VT" "$BASE" "$TP" >/dev/null 2>&1 && ok "verify_traceability 通过" || ng "verify_traceability 失败"
 
 echo
 echo "========== 5. 负面回归（必须抓到问题）=========="
-cp "$S/output/tp/test-point.md" /tmp/_tp.bak
-cp "$S/output/tc/test-case.md" /tmp/_tc.bak
-cp "$S/scope/anchors.md" /tmp/_an.bak
+cp "$TP" /tmp/_tp.bak
+cp "$TC" /tmp/_tc.bak
+cp "$BASE" /tmp/_base.bak
 
-# 5.1 摘录超 40 字
-python3 - <<'PY'
-p='workspace/runtime_demo/file/sess-demo-0001/scope/anchors.md'
-s=open(p,encoding='utf-8').read().replace(
- '风险名称必填，长度不超过 50 个字符。',
- '风险名称必填，长度不超过 50 个字符，风险等级为高、中、低三档，默认中，提交时校验审核人身份。')
-open(p,'w',encoding='utf-8').write(s)
-PY
-python3 "$VA" "$S/scope/anchors.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "摘录超长未被捕获" || ok "摘录超 40 字被捕获"
-cp /tmp/_an.bak "$S/scope/anchors.md"
-
-# 5.2 摘录非原文（幻觉）
-python3 - <<'PY'
-p='workspace/runtime_demo/file/sess-demo-0001/scope/anchors.md'
-s=open(p,encoding='utf-8').read().replace(
- '风险名称必填，长度不超过 50 个字符。',
- '风险名称必须填写且长度不得超出 50 个字符的限制要求。')
-open(p,'w',encoding='utf-8').write(s)
-PY
-python3 "$VA" "$S/scope/anchors.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "幻觉摘录未被捕获" || ok "幻觉摘录被捕获"
-cp /tmp/_an.bak "$S/scope/anchors.md"
-
-# 5.3 底册锚点未覆盖
+# 5.1 TP 直引摘录改写 → 引文不再逐字命中
 python3 - <<'PY'
 p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
-s=open(p,encoding='utf-8').read().replace('| M1-S4-P5 |  | 与 M1-S4-P4 语义重复，按锚点去重规则由 M1-S4-P4 覆盖 |\n','')
+s=open(p,encoding='utf-8').read()
+s=s.replace('「风险名称必填，长度不超过 50 个字符。」','「风险名称是必填的并且长度须不超过 50 字。」',1)
 open(p,'w',encoding='utf-8').write(s)
 PY
-python3 "$VP" "$S/output/tp/test-point.md" --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "锚点未覆盖未被捕获" || ok "底册锚点未覆盖被捕获"
-cp /tmp/_tp.bak "$S/output/tp/test-point.md"
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "TP 摘录改写未被捕获" || ok "TP 直引摘录改写被捕获"
+cp /tmp/_tp.bak "$TP"
 
-# 5.4 交付物出现业务功能编号
+# 5.2 TP 直引行号越界 → 必须捕获
+python3 - <<'PY'
+import re
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+s=re.sub(r'prd-demo\.md:L\d+', 'prd-demo.md:L9999', s, count=1)
+open(p,'w',encoding='utf-8').write(s)
+PY
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "TP 行号越界未被捕获" || ok "TP 直引行号越界被捕获"
+cp /tmp/_tp.bak "$TP"
+
+# 5.3 TP 依据未以直引/CL 开头（旧式锚点或纯文本）→ 必须捕获
 python3 - <<'PY'
 p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
-s=open(p,encoding='utf-8').read().replace('| TP-001 |','| TP-001 | 属 BF01 |',1)
+s=open(p,encoding='utf-8').read()
+s=s.replace('| TP-003 | 验证提交人修改自己创建的风险被受理 | 功能 | 场景法 | prd-demo.md:L',
+            '| TP-003 | 验证提交人修改自己创建的风险被受理 | 功能 | 场景法 | M1-S4-P3 ',1)
 open(p,'w',encoding='utf-8').write(s)
 PY
-python3 "$VP" "$S/output/tp/test-point.md" --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "业务功能编号泄漏未被捕获" || ok "交付物业务功能编号泄漏被捕获"
-cp /tmp/_tp.bak "$S/output/tp/test-point.md"
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "旧式锚点依据未被捕获" || ok "旧式锚点/纯文本依据被捕获"
+cp /tmp/_tp.bak "$TP"
 
-# 5.5 标签编造名称
+# 5.4 悬空 CL-999 → 必须捕获
+python3 - <<'PY'
+import re
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+row='| TP-099 | 验证挂空澄清编号 | 异常 | 错误推测 | CL-999 用户澄清：不存在。 |'
+out=[]
+for ln in s.split('\n'):
+    out.append(ln)
+    if ln.startswith('| TP-006 |'):
+        out.append(row)
+open(p,'w',encoding='utf-8').write('\n'.join(out))
+PY
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "悬空 CL-999 未被捕获" || ok "悬空澄清编号被捕获"
+cp /tmp/_tp.bak "$TP"
+
+# 5.5 覆盖对照表缺行（被引用证据未上表）→ 必须捕获
+python3 - <<'PY'
+import re
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+out=[]
+for ln in s.split('\n'):
+    if re.match(r'^\| prd-demo\.md:L\d+ \|', ln):
+        continue  # 删除第一张直引证据覆盖行
+    out.append(ln)
+open(p,'w',encoding='utf-8').write('\n'.join(out))
+PY
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "覆盖对照表缺行未被捕获" || ok "被引用证据未上覆盖表被捕获"
+cp /tmp/_tp.bak "$TP"
+
+# 5.6 覆盖对照表登记未被引用的证据（幻觉）→ 必须捕获
+python3 - <<'PY'
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+s=s.replace('## 需求→测试点覆盖表','| prd-demo.md:L1 | TP-001 |  |\n\n## 需求→测试点覆盖表',1)
+open(p,'w',encoding='utf-8').write(s)
+PY
+python3 "$VP" "$TP" --input-dir "$PRD" >/dev/null 2>&1 && ng "覆盖表幻觉证据未被捕获" || ok "覆盖表未被引用证据被捕获"
+cp /tmp/_tp.bak "$TP"
+
+# 5.7 基线引文改写 → 必须捕获
+python3 - <<'PY'
+import json
+p='workspace/runtime_demo/file/sess-demo-0001/scope/requirements-baseline.json'
+b=json.load(open(p,encoding='utf-8'))
+req=next(r for r in b['requirements'] if r['id']=='REQ-001')
+req['evidence'][0]['quote']='风险名称必填（上限 50 字）。'
+json.dump(b,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
+PY
+python3 "$VB" "$BASE" --input-dir "$PRD" --freeze >/dev/null 2>&1 && ng "基线引文改写未被捕获" || ok "基线直引摘录改写被捕获"
+cp /tmp/_base.bak "$BASE"
+
+# 5.8 基线 input_files 指纹篡改 → 必须捕获
+python3 - <<'PY'
+import json
+p='workspace/runtime_demo/file/sess-demo-0001/scope/requirements-baseline.json'
+b=json.load(open(p,encoding='utf-8'))
+b['input_files'][0]['sha256']='deadbeef'+b['input_files'][0]['sha256'][8:]
+json.dump(b,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
+PY
+python3 "$VB" "$BASE" --input-dir "$PRD" --freeze >/dev/null 2>&1 && ng "基线指纹篡改未被捕获" || ok "基线 input_files 指纹不符被捕获"
+cp /tmp/_base.bak "$BASE"
+
+# 5.9 待澄清需求不能冻结 → 必须捕获
+python3 - <<'PY'
+import json
+p='workspace/runtime_demo/file/sess-demo-0001/scope/requirements-baseline.json'
+b=json.load(open(p,encoding='utf-8'))
+req=next(r for r in b['requirements'] if r['id']=='REQ-003')
+req['status']='needs_clarification'
+req['question']='「自己创建」是否包含代创建场景？'
+json.dump(b,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
+PY
+python3 "$VB" "$BASE" --input-dir "$PRD" --freeze >/dev/null 2>&1 && ng "待澄清需求未被冻结关拦截" || ok "待澄清需求冻结被拦截"
+cp /tmp/_base.bak "$BASE"
+
+# 5.10 TC 标签编造名称 → 必须捕获
 python3 - <<'PY'
 p='workspace/runtime_demo/file/sess-demo-0001/output/tc/test-case.md'
-s=open(p,encoding='utf-8').read().replace('所属业务功能：新增风险','所属业务功能：风险登记管理',1)
+s=open(p,encoding='utf-8').read()
+s=s.replace('所属业务功能：新增风险','所属业务功能：风险登记管理',1)
 open(p,'w',encoding='utf-8').write(s)
 PY
-python3 "$VC" "$S/output/tc/test-case.md" --tp-file "$S/output/tp/test-point.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "标签编造未被捕获" || ok "标签编造名称被捕获"
-cp /tmp/_tc.bak "$S/output/tc/test-case.md"
+python3 "$VC" "$TC" --tp-file "$TP" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "标签编造未被捕获" || ok "标签编造名称被捕获"
+cp /tmp/_tc.bak "$TC"
 
-# 5.6 悬空 TP 引用
+# 5.11 悬空 TP 引用 → 必须捕获
 python3 - <<'PY'
 p='workspace/runtime_demo/file/sess-demo-0001/output/tc/test-case.md'
-s=open(p,encoding='utf-8').read().replace('| TC-004 | 审核人非本项目测试管理人提交被拒 | TP-004 |','| TC-004 | 审核人非本项目测试管理人提交被拒 | TP-099 |',1)
+s=open(p,encoding='utf-8').read()
+s=s.replace('| TC-004 | 审核人非本项目测试管理人提交被拒 | TP-004 |','| TC-004 | 审核人非本项目测试管理人提交被拒 | TP-099 |',1)
 open(p,'w',encoding='utf-8').write(s)
 PY
-python3 "$VC" "$S/output/tc/test-case.md" --tp-file "$S/output/tp/test-point.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "悬空TP引用未被捕获" || ok "悬空 TP 引用被捕获"
-cp /tmp/_tc.bak "$S/output/tc/test-case.md"
+python3 "$VC" "$TC" --tp-file "$TP" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "悬空TP引用未被捕获" || ok "悬空 TP 引用被捕获"
+cp /tmp/_tc.bak "$TC"
 
-# 5.7 TP 未被覆盖
+# 5.12 TP 未覆盖且无原因 → 必须捕获
 python3 - <<'PY'
 p='workspace/runtime_demo/file/sess-demo-0001/output/tc/test-case.md'
-s=open(p,encoding='utf-8').read().replace('| TP-003 |  | 可见范围差异由 TC 在 TP-001 下补充，不单列 |','| TP-003 |  |  |',1)
+s=open(p,encoding='utf-8').read()
+s=s.replace('| TP-003 |  | 可见范围差异由 TC 在 TP-001 下补充，不单列 |','| TP-003 |  |  |',1)
 open(p,'w',encoding='utf-8').write(s)
 PY
-python3 "$VC" "$S/output/tc/test-case.md" --tp-file "$S/output/tp/test-point.md" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "TP未覆盖未被捕获" || ok "TP 未覆盖且无原因被捕获"
-cp /tmp/_tc.bak "$S/output/tc/test-case.md"
+python3 "$VC" "$TC" --tp-file "$TP" --prd-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "TP未覆盖未被捕获" || ok "TP 未覆盖且无原因被捕获"
+cp /tmp/_tc.bak "$TC"
+
+# 5.13 已确认需求无 TP 覆盖 → traceability 必须捕获
+python3 - <<'PY'
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+lines=s.split('\n')
+final=[ln for ln in lines if not ln.startswith('| REQ-006 |')]
+open(p,'w',encoding='utf-8').write('\n'.join(final))
+PY
+python3 "$VT" "$BASE" "$TP" >/dev/null 2>&1 && ng "已确认需求无覆盖未被捕获" || ok "已确认需求无 TP 覆盖被捕获"
+cp /tmp/_tp.bak "$TP"
+
+# 5.14 verify_quotes 独立漂移检测（引用表直验）
+printf '# 引用表\n| 来源文件 | 行号 | 原话摘录 |\n|---|---|---|\n| prd-demo.md | 199 | 风险等级分为高中低三档。 |\n' > /tmp/_q.md
+python3 "$VQ" /tmp/_q.md --input-dir "$PRD" >/dev/null 2>&1 && ng "verify_quotes 漂移未被捕获" || ok "verify_quotes 引文漂移被捕获"
+rm -f /tmp/_q.md
 
 echo
-echo "===== 5b. A1/A2/A3/A4 修复回归（--clarifications / SHA256 / docx）====="
-TPFIX="$S/output/tp/test-point.md"
-CLF="$S/state/clarifications.md"
-cp "$TPFIX" /tmp/_tp.clear.bak
-
-# 5b-1 悬空 CL-999 → 必须 FAIL（临时副本）
-python3 - <<'PY'
-s=open('workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md',encoding='utf-8').read()
-row='| TP-099 | 验证挂空澄清编号的场景被拒绝 | 异常 | 错误推测 | CL-999 用户澄清：不存在。 |'
-s=s.replace('| TP-006 | 验证审核通过后风险状态变更为已审核 | 流程 | 状态迁移 | M1-S4-P8 审核通过后状态变更为已审核；审核不通过则退回，状态为已关闭。 |',
-            '| TP-006 | 验证审核通过后风险状态变更为已审核 | 流程 | 状态迁移 | M1-S4-P8 审核通过后状态变更为已审核；审核不通过则退回，状态为已关闭。 |\n'+row)
-open('/tmp/_tp.cl999.md','w',encoding='utf-8').write(s)
-PY
-python3 "$VP" /tmp/_tp.cl999.md --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" --clarifications "$CLF" >/dev/null 2>&1 && ng "悬空 CL-999 未被捕获" || ok "A2: 悬空澄清编号被捕获"
-rm -f /tmp/_tp.cl999.md
-
-# 5b-2 依据摘录改写 → 必须 FAIL
-cp "$TPFIX" /tmp/_tp.rew.md
-python3 - <<'PY'
-s=open('/tmp/_tp.rew.md',encoding='utf-8').read()
-s=s.replace('M1-S4-P1 风险名称必填，长度不超过 50 个字符。','M1-S4-P1 风险名称必须填写，且长度上限为 50 个字符。',1)
-open('/tmp/_tp.rew.md','w',encoding='utf-8').write(s)
-PY
-python3 "$VP" /tmp/_tp.rew.md --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" --clarifications "$CLF" >/dev/null 2>&1 && ng "摘录改写未被捕获" || ok "A3: 依据摘录与底册不一致被捕获"
-rm -f /tmp/_tp.rew.md
-
-# 5b-3 正面回归带 --clarifications（退出码 0 且含 SHA256 行）
-OUT=$(python3 "$VP" "$TPFIX" --ledger "$S/scope/anchors.md" --scope-list "$S/state/scope-list.md" --clarifications "$CLF" 2>&1)
-if echo "$OUT" | grep -q '\[SHA256\]' && echo "$OUT" | tail -1 | grep -q 'FAIL=0'; then ok "A4: 脚本输出含 [SHA256] 且原清单全绿"; else ng "A4: SHA256 行缺失或校验非绿: $(echo "$OUT" | tail -2 | head -1)"; fi
-
-# 5b-4 docx PRD → 摘录逐字命中 PASS
-python3 - <<'PY'
-import zipfile, os, shutil
-d='/tmp/_selftest_docx'
-shutil.rmtree(d, ignore_errors=True)
-os.makedirs(d)
-src=open('workspace/runtime_demo/file/project-docs/prd-demo.md',encoding='utf-8').read()
-paras=[l.strip() for l in src.split(chr(10)) if l.strip()]
-body=''.join('<w:p><w:r><w:t xml:space="preserve">'+t.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')+'</w:t></w:r></w:p>' for t in paras)
-doc='<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body+'</w:body></w:document>'
-ct='<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
-rels='<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'
-with zipfile.ZipFile(d+'/prd.docx','w') as z:
-    z.writestr('[Content_Types].xml',ct); z.writestr('_rels/.rels',rels); z.writestr('word/document.xml',doc)
-PY
-python3 "$VA" "$S/scope/anchors.md" --prd-dir /tmp/_selftest_docx --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ok "PRD/docx: 摘录逐字命中 docx 通过" || ng "PRD/docx: docx 命中校验失败"
-rm -rf /tmp/_selftest_docx /tmp/_tp.clear.bak
+echo "========== 6. 全链交付校验（validate_delivery full + 报告指纹）=========="
+REPORT="$S/output/reports/machine-full.json"
+python3 .opencode/skills/test-point-spec/scripts/validate_delivery.py --phase full \
+  --input-dir "$PRD" --baseline "$BASE" --scope-list "$S/state/scope-list.md" \
+  --tp-file "$TP" --tc-file "$TC" --clarifications "$S/state/clarifications.md" \
+  --report "$REPORT" >/dev/null 2>&1 && ok "全链机械校验通过" || ng "全链机械校验失败"
+python3 .opencode/skills/test-point-spec/scripts/verify_validation_report.py "$REPORT" >/dev/null 2>&1 \
+  && ok "校验报告与产物指纹一致" || ng "校验报告指纹失配"
+grep -q 'source-catalog\|anchors' "$REPORT" >/dev/null 2>&1 && ng "报告仍含 V1 步骤" || ok "机器报告无 V1 步骤残留"
 
 echo
-echo "========== 6. 摘录提取脚本 =========="
-OUT=$(python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "M1-S4-P6" 2>&1)
-if [ $? -eq 0 ] && echo "$OUT" | grep -q "提交时校验审核人身份"; then ok "extract_excerpt 提取正确"; else ng "extract_excerpt 提取失败: $OUT"; fi
+echo "===== 6b. 摘录定位与批量（纯文本辅助）====="
+OUT=$(python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "4" --max-chars 40 2>&1)
+if echo "$OUT" | grep -q "提交时校验审核人身份"; then ok "extract_excerpt 提取正确"; else ng "extract_excerpt 提取失败: $OUT"; fi
+LOC=/tmp/_loc.txt
+printf '功能需求\n不存在章节\n' > "$LOC"
+OUT=$(python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate-file "$LOC" 2>&1)
+echo "$OUT" | grep -q "1/2 条命中" && ok "批量定位一次取回多条" || ng "批量定位失败: $OUT"
+rm -f "$LOC"
 python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "NOT-EXIST" >/dev/null 2>&1 && ng "不存在的定位未拒绝" || ok "不存在的定位被拒绝"
 
 echo
-echo "========== 7. 工作空间结构 =========="
+echo "========== 7. 工作流工具单元回归 =========="
+python3 -m unittest discover -s tests >/dev/null 2>&1 && ok "工作流工具单元回归通过" || ng "工作流工具单元回归失败"
+
+echo
+echo "========== 8. 工作空间结构（V2 产物，无 anchors/source-catalog）=========="
 for d in "$W/project-docs" "$S/user-input" "$S/output/tp" "$S/output/tc" "$S/output/reports" "$S/state" "$S/scope"; do
   [ -d "$d" ] && ok "目录 $d" || ng "目录缺失 $d"
 done
+[ -f "$S/scope/outline.md" ] && ok "outline.md" || ng "outline.md 缺失"
+[ -f "$S/scope/files-manifest.md" ] && ok "files-manifest.md" || ng "files-manifest.md 缺失"
+[ ! -f "$S/scope/source-catalog.json" ] && ok "source-catalog.json 已不再生成" || ng "source-catalog.json 仍被生成"
+[ ! -f "$S/scope/anchors.md" ] && ok "anchors.md 已不再生成" || ng "anchors.md 仍被生成"
 [ -f "opencode.jsonc" ] && ok "opencode.jsonc" || ng "opencode.jsonc 缺失"
 [ -f "README.md" ] && ok "README.md" || ng "README.md 缺失"
 [ -f "工作空间目录结构.md" ] && ok "工作空间目录结构.md" || ng "工作空间目录结构.md 缺失"
