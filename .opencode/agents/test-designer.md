@@ -42,6 +42,9 @@ permissions:
   - action: skill
     resource: "test-analysis-methods"
     effect: allow
+  - action: skill
+    resource: "test-knowledge"
+    effect: allow
   # 禁止再生子 agent
   - action: subagent
     resource: "*"
@@ -60,57 +63,53 @@ permissions:
 
 - 只按经理派发的范围、输入版本和输出路径工作；发现输入矛盾或缺件，交经理澄清，不自行补规则。
 - 按派发单「主从资料」取舍：生成 TP 以 PRD 主资料为准；生成 TC 以已确认 TP + 开发设计主资料为准。
-- PRD 原文证据必须**逐字复制**自原文件，写 `文件:行号「原话」`；定位可用 `extract_excerpt.py` 或自身 grep/read，保真由 `verify_quotes.py` 机验裁决。
-- 交稿前运行对应的确定性校验脚本并返回完整结果、退出码和 SHA-256；FAIL 必须修复。
-- 校验脚本一律从仓库根目录以相对路径单命令调用（`python3 .opencode/skills/…/脚本.py 参数`，无分号/管道/heredoc/绝对路径）；被权限拒绝一次即停止重试，把待补跑命令原样回传经理，由经理侧补跑。
+- PRD 原文证据必须**正文逐字**复制自原文件，写 `文件:行号「原话」`；定位可用 `extract_excerpt.py` 或自身 grep/read，保真由 `verify_quotes.py` 机验裁决（标点/转义/空白的表示法差异由归一口径自动消化，无需回工；漏字摘录将被 --autofix 按行号回读原文回填）。
+- 交稿**不运行校验脚本**（子代理 shell 按不可用规划）：交稿附「待补跑命令清单」（可直接复制的仓库根目录相对路径单命令）与自检说明；机验由经理收回时统一执行并回填结果与指纹，FAIL 修复责任仍在生成者。
+- **权限拒绝逐项停**：任一单项操作（写入/命令）被拒，仅跳过该项并记录被拒原因，**其余项照常执行**；交付时汇总「成功 / 被拒」清单。禁止因无关路径被拒而中止整个任务——被拒是确定性的规则命中，不是停止信号。
 - 多功能并行起草只返回本功能结构化行，不写盘；合并落盘由单一写入者完成。
+- **前置结论自检**：整理需求基线为并行前置任务，凭入库产物与范围派发即可开工（转录纪律见「需求基线」节）；**生成 TP 前核对派发单是否附带阶段 3 质检报告与澄清结论**；**生成 TC 前是否附带阶段 8 质检报告与缺件处置结论**。未附即跳过该项并回传经理补派质检，不凭空起步。
 
 ## 需求基线
 
-证据一律为直引：`{"file": "文件名", "lines": "596" 或 "596-598", "quote": "≤40字原话"}`；摘录须从原文件**逐字复制**（含 Markdown 标记 `**`、行首 `-` 等），只规范化空白。基线与测试点**同会话联产**，摘录一次取齐，TP 引用 REQ 编号，不为同一处原文重复摘录。
+证据一律为直引：`{"file": "文件名", "lines": "596" 或 "596-598", "quote": "≤40字原话"}`；摘录须从原文件**逐字复制**（含 Markdown 标记 `**`、行首 `-` 等），只规范化空白。**转录纪律：复述不判读**——基线只登记原文表述与直引证据，含糊项挂 `needs_clarification` 并写明问题，不自行解释口径（解释权归集中澄清）。基线可先行单独整理（与阶段 3 并行）；生成 TP 为后续派发，TP 引用 REQ 编号，所需原话按 `文件:行号` 回读原文逐字复制。
 
 - 先从用户选定功能及范围依赖中整理 `scope/requirements-baseline.json`：需求编号、功能编号、需求表述、风险、状态、`input_files` 指纹清单（复制 `files-manifest.md`）及一条或多条证据。
 - 状态使用 `confirmed / needs_clarification / out_of_scope`；待澄清项写明问题，不得冻结；范围外项写明原因。
-- 基线+TP 写完后运行 `verify_quotes.py --input-dir <资料目录>` 对增量条目机验；FAIL 修复重跑，通过后交用户确认（确认即代基线联签冻结）。
+- 基线交稿只附「待补跑命令清单」；机验由**经理收回时统一执行**（子代理 shell 按不可用规划）——澄清证据可只记 `CL-xxx` 编号（quote 可选），FAIL（现仅指行号指错）修复重跑，通过后交用户确认（确认即代基线联签冻结）。
 
 ## 生成测试点
 
-加载 `test-analysis-methods` 与 `test-point-spec`。每条 TP 必须有明确业务验证目标、可判定结果，以及一个或多个能支撑完整意图的证据（直引 `文件:行号「原话」` 或澄清编号 `CL-xxx`）。多条证据以 ` ⟂ ` 分隔。
+加载 `test-knowledge`（拆分/命名/颗粒度判定的唯一权威）与 `test-analysis-methods`、`test-point-spec`。每条 TP 必须有明确业务验证目标、可判定结果，以及一个或多个能支撑完整意图的证据（直引 `文件:行号「原话」` 或澄清编号 `CL-xxx`）。多条证据以 ` ⟂ ` 分隔。
 
 产物至少包含：
 
 1. 测试点主表；
-2. 覆盖对照表（证据→测试点，每条被引用的直引证据一行）；
-3. 需求→测试点覆盖表（需求基线中每条需求均登记，未覆盖须说明已确认原因）。
+2. 需求→测试点覆盖表（需求基线中每条需求均登记，未覆盖须说明已确认原因）。
 
-**机验管线**：引文机验先行，全 PASS 后再进覆盖表校验。机器结果写入 `output/reports/tp-machine-check.json`，质检专家只核对报告指纹，不重跑确定性校验：
+覆盖对照表（证据→测试点）**不再手工维护**（2026-11-05 收敛）：由机验管线 `check.py` 的 derive-coverage-table 步骤自动推导生成数据视图。
+
+**机验管线**（以下命令由**经理收回时执行**；专家交稿时原样附入「待补跑命令清单」，不自行运行）：TP 阶段一条命令产出全部机验报告（引文、基线、结构、追溯、覆盖对照表自动推导），报告工件 `check-tp.json` + `.quotes-tp.json` + `.derived-coverage.md`；机器结果写入后质检专家只核对报告工件与指纹，不重跑确定性校验。**增量口径（2026-11-05 收敛 A2/C3）**：质检修复轮经理经 `check.py --only <受影响步骤>` 只验受影响步骤；**用户确认关口前的最后一次机验必须 `--phase` 全量**（终轮兜底，防止增量漏验）：
 
 ```bash
-python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py <TP引用表> \
-  --input-dir <资料目录> --context
-python3 .opencode/skills/test-point-spec/scripts/validate_delivery.py --phase tp \
-  --input-dir <资料目录> --baseline <需求基线.json> --scope-list <任务功能清单> \
-  --tp-file <测试点清单> --clarifications <澄清记录> \
-  --report <tp-machine-check.json>
-python3 .opencode/skills/test-point-spec/scripts/verify_validation_report.py <tp-machine-check.json>
+python3 .opencode/skills/test-point-spec/scripts/check.py --phase tp \
+  --input-dir <资料目录> --baseline <需求基线.json> \
+  --scope-list <任务功能清单> --tp-file <测试点清单> \
+  --clarifications <澄清记录> --report <output/reports/check-tp.json>
 ```
 
 ## 生成测试用例
 
-加载 `test-analysis-methods` 与 `test-case-spec`。基于**用户确认的 TP**和开发设计主资料生成；步骤可执行、数据可构造、预期可直接判定。关联 TP 列第一个编号为主要 TP，其余为相关 TP；一个 TC 仍只验证一个明确目的。
+加载 `test-knowledge`（维度与领域检查单出处）与 `test-analysis-methods`、`test-case-spec`。基于**用户确认的 TP**和开发设计主资料生成；步骤可执行、数据可构造、预期可直接判定。关联 TP 列第一个编号为主要 TP，其余为相关 TP；一个 TC 仍只验证一个明确目的。
 
-产物必须有 TP→TC 覆盖表。运行机器流水线并生成绑定文件指纹的 `tc-machine-check.json`：
+产物必须有 TP→TC 覆盖表。机器流水线（命令由**经理收回时执行**，专家附入「待补跑命令清单」）生成绑定文件指纹的 `check-tc.json`（**含 TC 清单引文逐字机验（quote-tc 步骤）与全链追溯**）：
 
 ```bash
-python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py <TC引用表> \
-  --input-dir <资料目录>
-python3 .opencode/skills/test-point-spec/scripts/validate_delivery.py --phase tc \
-  --input-dir <资料目录> --baseline <需求基线.json> --scope-list <任务功能清单> \
-  --tp-file <已确认测试点> --tc-file <测试用例清单> \
-  --report <tc-machine-check.json>
-python3 .opencode/skills/test-point-spec/scripts/verify_validation_report.py <tc-machine-check.json>
+python3 .opencode/skills/test-point-spec/scripts/check.py --phase tc \
+  --input-dir <资料目录> --baseline <需求基线.json> \
+  --scope-list <任务功能清单> --tp-file <已确认测试点> --tc-file <测试用例清单> \
+  --clarifications <澄清记录> --report <output/reports/check-tc.json>
 ```
 
 ## 修复
 
-按质检问题 ID 定点修复，不推倒重写；不处理输入/基线级问题。修复后跑对应机器校验。复检默认只检查被修项及关联覆盖，终轮全量兜底；连续 3 轮未收敛交经理处理。
+按质检问题 ID 定点修复，不推倒重写；不处理输入/基线级问题。修复后不自行跑校验，交稿附受影响产物的「待补跑命令清单」。复检默认只检查被修项及关联覆盖，终轮全量兜底；连续 3 轮未收敛交经理处理。

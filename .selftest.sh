@@ -45,10 +45,10 @@ perm_block .opencode/agents/test-manager.md | grep -q 'output/tp\|output/tc\|out
 
 echo
 echo "========== 3. Skill 与脚本完整性（V2 唯一，无旧版遗留） =========="
-for s in prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec; do
+for s in test-knowledge prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec; do
   [ -f ".opencode/skills/$s/SKILL.md" ] && ok "skill $s" || ng "skill $s 缺失"
 done
-for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/validate_delivery.py .opencode/skills/test-point-spec/scripts/verify_validation_report.py; do
+for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/check.py .opencode/skills/_lib/mdtable.py; do
   [ -f "$f" ] && ok "$(basename "$f")" || ng "$(basename "$f") 缺失"
 done
 for f in build_source_catalog.py verify_source_catalog.py verify_anchors.py; do
@@ -226,15 +226,38 @@ printf '# 引用表\n| 来源文件 | 行号 | 原话摘录 |\n|---|---|---|\n| 
 python3 "$VQ" /tmp/_q.md --input-dir "$PRD" >/dev/null 2>&1 && ng "verify_quotes 漂移未被捕获" || ok "verify_quotes 引文漂移被捕获"
 rm -f /tmp/_q.md
 
+# 5.15 资料角色登记机制存在性（经理入库登记）
+grep -q '资料角色登记' "$S/state/scope-list.md" && ok "scope-list 含资料角色登记表" || ng "scope-list 缺资料角色登记表"
+
+# 5.16 TP 引用 CL 却未提供 --clarifications → 必须捕获
+cp "$TP" /tmp/_tp.cl.bak
+python3 - <<'PY'
+import re
+p='workspace/runtime_demo/file/sess-demo-0001/output/tp/test-point.md'
+s=open(p,encoding='utf-8').read()
+s=re.sub(r'\| (TP-001 \| [^|]+ \| [^|]+ \| [^|]+ \| )prd-demo\.md:L\d+ 「[^」]+」 \|',
+         r'| \1CL-001 用户澄清：名称必填以第 4 章为准。 |', s, count=1)
+open(p,'w',encoding='utf-8').write(s)
+PY
+python3 "$VP" "$TP" --input-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "引用 CL 无澄清记录未被捕获" || ok "引用 CL 却未提供 --clarifications 被捕获"
+cp /tmp/_tp.cl.bak "$TP"
+rm -f /tmp/_tp.cl.bak
+
 echo
-echo "========== 6. 全链交付校验（validate_delivery full + 报告指纹）=========="
-REPORT="$S/output/reports/machine-full.json"
-python3 .opencode/skills/test-point-spec/scripts/validate_delivery.py --phase full \
+echo "========== 6. 全链交付校验（check full + 报告指纹）=========="
+REPORT="$S/output/reports/check-full.json"
+python3 .opencode/skills/test-point-spec/scripts/check.py --phase full \
   --input-dir "$PRD" --baseline "$BASE" --scope-list "$S/state/scope-list.md" \
   --tp-file "$TP" --tc-file "$TC" --clarifications "$S/state/clarifications.md" \
   --report "$REPORT" >/dev/null 2>&1 && ok "全链机械校验通过" || ng "全链机械校验失败"
-python3 .opencode/skills/test-point-spec/scripts/verify_validation_report.py "$REPORT" >/dev/null 2>&1 \
-  && ok "校验报告与产物指纹一致" || ng "校验报告指纹失配"
+[ -f "$REPORT" ] && python3 -c "import json,sys;d=json.load(open('$REPORT'));exit(0 if d.get('passed') is True else 1)" >/dev/null 2>&1 \
+  && ok "校验报告 passed=true 且指纹自检内建通过" || ng "校验报告状态异常"
+# TC 引文明细报告按管线契约条件存在：TC 清单含直引 → 必有子报告；无直引 → 正确 skip
+if grep -Eq 'prd.*\.md:L[0-9]+「' "$TC" 2>/dev/null; then
+  [ -f "${REPORT%.json}.quotes-tc.json" ] && ok "TC 引文明细报告已产出" || ng "TC 引文明细报告缺失"
+else
+  [ ! -f "${REPORT%.json}.quotes-tc.json" ] && ok "TC 无直引，quote-tc 正确跳过" || ng "TC 无直引却产生了引文报告"
+fi
 grep -q 'source-catalog\|anchors' "$REPORT" >/dev/null 2>&1 && ng "报告仍含 V1 步骤" || ok "机器报告无 V1 步骤残留"
 
 echo

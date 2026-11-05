@@ -12,6 +12,10 @@
 
 机械校验由脚本执行。设计专家生成后每个版本运行一次校验流水线；质检专家核对指纹并独立检查语义，不重复跑相同机械校验。用户输入只读。
 
+## 知识库（唯一语义判据）
+
+测试语义判定的唯一权威在 `.opencode/skills/test-knowledge/`：四份**原文**（①通用测试方法论、②测试维度定义、③通用测试规则、④测试点生成指南，只读不改）+ 两份**补充件**（TP 切分与命名判别、领域专项检查单）。各 skill 只引用不复述；口径冲突时**以知识库为准**（改 skill，不改知识）。调优路径：改补充件，或经用户决定整体替换原文。导入原始版本留存于仓库根 `测试知识/`（只读存档）。
+
 ## 资料约定（唯一流程）
 
 - **只收可定位行号的文本格式**（md/markdown/txt/csv）。发现 docx/pdf/图片等非文本件 → 一次性告知用户替换后再开工，AI 不代转，**无遗留分支**。
@@ -22,11 +26,13 @@
 1. **资料入库（fail-fast）**：`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
 2. **轻扫描、选范围**：依据 outline.md 列出候选功能与规则编号索引；用户选范围时一并确认资料角色，之后才做深度质检。
 3. **范围闭合**：补入相关全局约束和跨功能依赖；仅对本次范围及依赖质检。
-4. **建需求基线+测试点联产**：设计专家整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话）并同会话联产测试点草稿；PRD 与开发资料检查并行，问题尽量合并一次询问。技术资料缺失只阻塞 TC，不阻塞 TP。
-5. **集中澄清**：按主从优先级标准的歧义、矛盾、缺件合并一次询问；结论登记 `CL-xxx`。
-6. **机验+用户确认**：`verify_quotes.py` 引文逐字机验 + 覆盖表校验通过后，由用户确认测试点（确认即代基线联签冻结）。
-7. **生成 TC**：基于确认 TP 和开发设计主资料生成；机器校验和独立语义质检（引用只机验+定向抽查）通过后由用户确认。
-8. **修复与变更**：按问题 ID 和追溯关系增量修复，最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
+4. **资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单落盘 `output/reports/tp-input-check.md`；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
+5. **集中澄清**：QA 澄清候选与基线占位合并一次询问；结论登记 `CL-xxx`。**影响 TP 判定的澄清闭环后，TP 才生成**（仅影响 TC 数据构造的缺件项登记即可放行）。
+6. **生成测试点（阶段 5 尾）**：设计专家基于落盘基线、CL 结论与阶段 3 报告生成测试点。
+7. **机验+用户确认**：`verify_quotes.py` 引文逐字机验 + 覆盖表校验 + 独立语义质检通过后，由用户确认测试点（确认即代基线联签冻结），并生成测试点数据视图 `test-point-table.md`。
+8. **用例资料质检（阶段 8，先行）**：检查开发设计主资料可测性与缺件，报告落盘 `output/reports/tc-input-check.md`；缺件经澄清闭环或让步留痕后用例分支才启动。
+9. **生成 TC（阶段 10）**：基于确认 TP、阶段 8 结论和开发设计主资料生成；机器校验和独立语义质检（引用只机验+定向抽查）通过后由用户确认，并生成用例数据视图 `test-case-table.md`。
+10. **修复与变更**：按问题 ID 和追溯关系增量修复，最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
 
 用户正式确认只有 TP 和 TC 两处。真正需要用户决策的问题必须等待，不能猜答案。
 
@@ -36,11 +42,13 @@
 scope/files-manifest.md            # 文本资料指纹清单（Python 侧 sha256）
 scope/outline.md                   # 轻扫描：标题树+规则编号索引
 scope/requirements-baseline.json   # 结构化需求、input_files 指纹、来源证据（文件:行号+原话）、风险与状态
-output/tp/test-point.md            # 含证据→TP、需求→TP 两张覆盖表
-output/tc/test-case.md             # 含 TP→TC 覆盖表；TC 可关联主 TP 和相关 TP
-output/reports/tp-machine-check.json  # TP 机器结果及产物/脚本指纹
-output/reports/tc-machine-check.json  # TC 机器结果及产物/脚本指纹
-output/reports/machine-full.json       # 最终全量兜底结果
+output/tp/test-point.md            # 含证据→TP、需求→TP 两张覆盖表（唯一权威）
+output/tp/test-point-table.md      # 测试点数据视图（仅一张表；export_tables.py 派生，呈现层，主件变更重导即刷新）
+output/tc/test-case.md             # 含 TP→TC 覆盖表；TC 可关联主 TP 和相关 TP（唯一权威）
+output/tc/test-case-table.md       # 测试用例数据视图（仅一张表；呈现层，主件变更重导即刷新）
+output/reports/check-tp.json       # TP 机验报告（+ .quotes-tp.json：TP 引文逐字明细）
+output/reports/check-tc.json       # TC 机验报告（+ .quotes-tc.json：TC 引文逐字明细）
+output/reports/check-full.json     # 最终全量兜底结果
 output/reports/*-check.md          # 独立语义质检报告
 ```
 
@@ -52,9 +60,17 @@ python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
   --input-dir <资料目录> --output <会话目录>/scope/outline.md \
   --manifest <会话目录>/scope/files-manifest.md
 
-# 引文机验：对原文件按 文件:行号 逐字比对（--extract-from 直接抽清单自体引用）
+# 机验统一入口：一条命令产出"引文逐字（TP/TC 各自）+ 基线 + 清单结构 + 追溯 + 报告新鲜度"的
+# 带指纹 JSON 报告，供质检按工件采信（阶段/报告命名：check-tp / check-tc / check-full）
+python3 .opencode/skills/test-point-spec/scripts/check.py \
+  --phase full --input-dir <资料目录> \
+  --baseline <requirements-baseline.json> \
+  --scope-list <scope-list.md> --tp-file <test-point.md> --tc-file <test-case.md> \
+  --clarifications <clarifications.md> --report <output/reports/check-full.json>
+
+# 引文逐字机验（可单独运行；--report 落带清单指纹的 JSON 工件）
 python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
-  <引用表或清单文件> --input-dir <资料目录> --context
+  <引用表或清单文件> --input-dir <资料目录> --context --report <引文报告.json>
 
 # 摘录定位辅助（可选）：按章节定位并截取 ≤40 字连续原句
 python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py \
@@ -65,14 +81,15 @@ python3 .opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py 
   <requirements-baseline.json> --input-dir <资料目录> \
   --clarifications <clarifications.md> --freeze
 
-# 每个产物版本运行相应校验；最终交付用 full
-python3 .opencode/skills/test-point-spec/scripts/validate_delivery.py \
-  --phase full --input-dir <资料目录> \
-  --baseline <requirements-baseline.json> \
-  --scope-list <scope-list.md> --tp-file <test-point.md> --tc-file <test-case.md> \
-  --clarifications <clarifications.md> --report <machine-check.json>
-python3 .opencode/skills/test-point-spec/scripts/verify_validation_report.py <machine-check.json>
+# 数据视图：清单主件 → 纯数据表（机验 PASS 后由经理生成；行数/编号与主表自洽，仅作查看）
+python3 .opencode/skills/test-point-spec/scripts/export_tables.py \
+  --phase tp --tp-file <test-point.md> --baseline <requirements-baseline.json> \
+  --scope-list <scope-list.md> --output <test-point-table.md>
+python3 .opencode/skills/test-point-spec/scripts/export_tables.py \
+  --phase tc --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
 ```
+
+> 历史兼容：2026-11-05 前产出的旧命名报告（`tp-machine-check.json` / `tc-machine-check.json` / `machine-full.json`）与历史清单内"待补跑命令清单"中的旧命令名（`validate_delivery.py` 等）均为**历史留痕**，不随本收敛改写；新任务一律使用 `check.py` 与 `check-<phase>.json` 命名。历史清单文件中的旧命令已失效，勿照抄。
 
 来源目录只读；校验报告记录输入和校验脚本指纹。
 

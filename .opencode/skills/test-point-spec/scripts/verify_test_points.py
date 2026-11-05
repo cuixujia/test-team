@@ -6,11 +6,13 @@
   2. 验证意图以「验证」开头
   3. 必填字段非空（验证意图/类型/分析方法/依据）
   4. 依据证据项校验（每项必须是行首证据 token）：
-     - 直引证据：`文件名:L行号或区间「原话」` → 对原文件该行就地逐字校验（--input-dir 必填）
+     - 直引证据：`文件名:L行号或区间「原话」` → **格式/定位校验**（摘录正文保真由
+       check.py 的 quote-tp 步统一逐字裁决——2026-11-05 收敛，本关不再双重比字）
      - 澄清证据：CL-xxx → 必须存在于澄清记录（--clarifications，未提供而引用即 FAIL）
      - 其余写法（含旧锚点 ID）一律 FAIL，杜绝幻觉锚点
-  5. 覆盖对照表存在（证据→测试点）；已引用的 直引证据 必须上表；
-     未覆盖须写明原因；CL 行可选、不参与覆盖核算；表内证据必须真实被引用过
+  5. 覆盖对照表（证据→测试点）可省略（2026-11-05 收敛：由机验管线自动推导，
+     check.py 的 derive-coverage-table 步骤输出数据视图）；手工提供时仍按契约校验：
+     已引用的 直引证据 必须上表；未覆盖须写明原因；CL 行可选、不参与覆盖核算
   6. 交付物中不得出现业务功能编号
   7. 输出 [SHA256] 行（交稿自证/收回核验共用同一指纹来源）
 
@@ -23,6 +25,11 @@ import os
 import re
 import sys
 import argparse
+
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+from mdtable import parse_first_table, parse_md_table, read_text, sha256_file as sha256_of  # noqa: E402
 
 FAILS = []
 PASSES = []
@@ -42,131 +49,13 @@ def warn(m):
     print(f"[WARN] {m}")
 
 
-def read_text(path):
-    for enc in ("utf-8", "utf-8-sig", "gbk"):
-        try:
-            with open(path, "r", encoding=enc) as f:
-                return f.read()
-        except UnicodeDecodeError:
-            continue
-    raise RuntimeError(f"无法解码: {path}")
+# 逐字比对已收敛至 check.py 的 quote-tp 步（verify_quotes.py，归一比对 + --autofix 自愈），
+# 本脚本不再对摘录做原文比对（2026-11-05 收敛 A1：消除双重机验与口径分歧）；
+# 引文裁决口径以 check.py 报告工件为准。
 
 
-def sha256_of(path):
-    import hashlib
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def norm(s):
-    """空白规范化（保留引号等字符——引号漂移必须被抓到，不做引号归一）。"""
-    return re.sub(r"\s+", "", s)
-
-
-def v2_quote_ok(input_dir, rel, lines_spec, quote, cache={}):
-    """直引校验：摘录在 指定文件指定行（区间连接）中空白规范化后逐字命中。"""
-    try:
-        if rel in cache:
-            lines = cache[rel]
-        else:
-            path = os.path.join(input_dir, rel)
-            if not os.path.isfile(path):
-                return False
-            with open(path, encoding="utf-8-sig") as stream:
-                lines = stream.read().splitlines()
-            cache[rel] = lines
-        m = re.fullmatch(r"(\d+)(?:\s*[-~]\s*(\d+))?", str(lines_spec).strip())
-        if not m:
-            return False
-        start, end = int(m.group(1)), int(m.group(2) or m.group(1))
-        if start < 1 or end < start or end > len(lines):
-            return False
-        haystack = norm("\n".join(lines[start - 1:end]))
-        return bool(quote) and norm(quote) in haystack
-    except OSError:
-        return False
-
-
-def parse_md_table(text, keyword):
-    """返回 (表头行, 数据行列表)。
-
-    - keyword 非空：只取标题含 keyword 的 ## 章节下的第一张表。
-    - keyword 为空：取全文中**第一个 ## 章节之前**的主表（若无 ##，则取第一张表）。
-    """
-    header, rows = None, []
-    if keyword:
-        in_sec = False
-        for line in text.split("\n"):
-            if line.startswith("##"):
-                if in_sec:
-                    break
-                in_sec = keyword in line
-                if in_sec:
-                    header, rows = None, []
-                continue
-            if not in_sec:
-                continue
-            s = line.strip()
-            if not s.startswith("|"):
-                continue
-            cells = [c.strip() for c in s.strip("|").split("|")]
-            if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-                continue
-            if header is None:
-                header = cells
-                continue
-            rows.append(cells)
-        return header, rows
-
-    # 主表：第一个 ## 之前
-    for line in text.split("\n"):
-        if line.startswith("##"):
-            break
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-            continue
-        if header is None:
-            header = cells
-            continue
-        rows.append(cells)
-    return header, rows
-
-
-def parse_first_table(text):
-    """返回 (表头行, 数据行列表)——取文档中第一张表。
-
-    兼容两种写法：
-      A. 表在某个 ## 章节下 → 取该章节的第一张表
-      B. 表直接跟在 H1 下（无 ## 章节）→ 取全文第一张表
-    """
-    rows_all = []
-    header = None
-    seen_section = False
-    for line in text.split("\n"):
-        if line.startswith("##"):
-            if seen_section:
-                break
-            seen_section = True
-            continue
-        if not seen_section and line.startswith("#"):
-            continue
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-            continue
-        if header is None:
-            header = cells
-            continue
-        rows_all.append(cells)
-    return header, rows_all
+# parse_md_table / parse_first_table / norm / read_text / sha256_of 已收敛至
+# .opencode/skills/_lib/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
 
 
 # 直引证据（文件:行号+原话，唯一 PRD 证据格式，见 prd-record-spec/SKILL.md）
@@ -269,7 +158,7 @@ def main():
             _ch, crows = parse_first_table(ct)
             cl_ids = {r[0] for r in crows if r and re.fullmatch(r"CL-\d+", r[0])}
 
-    cited = set()           # 被引用的 直引 token：file:Llines
+    cited = set()           # 被引用的 直引 token：file:Llines（保真裁决由 quote-tp 步负责，本关只做 token 定位校验）
     used_cl = set()
     for r in main_rows:
         cell = r[4] if len(r) > 4 else ""
@@ -291,20 +180,26 @@ def main():
                 elif tok not in cl_ids:
                     fail(f"澄清编号不在澄清记录中: {r[0]} ({tok})")
                 continue
-            cited.add(tok)
+            # 2026-11-05 收敛（A1）：不再在此对原文件逐字比对——保真与自愈统一由 quote-tp 步裁决；
+            # 本关校验 token 结构（文件与行号写法可解析，防幻觉锚点）。
             rel, spec, quote = cite
-            if not v2_quote_ok(args.input_dir, rel, spec, quote):
-                fail(f"直引摘录未在 {rel}:L{spec} 逐字命中: {r[0]} 「{quote[:30]}」")
+            if not re.fullmatch(r"[A-Za-z0-9_\-./\u4e00-\u9fff]+\.(?:md|markdown|txt|csv)", rel) \
+                    or not re.fullmatch(r"\d+(?:\s*[-~]\s*\d+)?", spec):
+                fail(f"直引证据定位写法非法（文件名/行号）: {r[0]} ({rel}:L{spec})")
+                continue
+            cited.add(tok)
 
-    if cited and not any(m.startswith("直引摘录未在") for m in FAILS):
-        ok("直引证据逐字校验通过")
+    if cited and not any("直引证据定位写法非法" in m for m in FAILS):
+        ok("直引证据定位格式校验通过（逐字保真由 quote-tp 步裁决）")
     if used_cl and not any("澄清编号" in m for m in FAILS):
         ok("澄清编号存在性校验通过")
 
-    # 5) 覆盖对照表（证据→测试点）：引用过的证据必须上表；表内证据必须真实被引用
+    # 5) 覆盖对照表（证据→测试点）：**可省略**（2026-11-05 收敛——该表可由机验管线从主表
+    #    自动推导，check.py 会生成 derived 数据视图；手工维护是表格式错误的主要来源）。
+    #    提供时仍按既有契约校验，防止"另写一份与主表矛盾的手工表"。
     ch, crows = parse_md_table(text, "证据→测试点")
     if not crows:
-        fail("缺少覆盖对照表章节（证据→测试点）或表内无有效行")
+        ok("覆盖对照表未手工提供（由机验管线自动推导，check.py derive-coverage-table 输出）")
     else:
         covered = set()
         bad_rows = []

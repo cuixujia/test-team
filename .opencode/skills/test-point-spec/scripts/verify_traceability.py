@@ -1,54 +1,20 @@
 #!/usr/bin/env python3
-"""Check requirement -> TP -> TC links across the approved baseline and lists."""
+"""Check requirement -> TP -> TC links across the approved baseline and lists.
+
+2026-11-05 收敛（B1）：表格解析迁移至 _lib/mdtable.parse_md_table 唯一实现，
+删除本地 parse_table 副本（契约散落回点）。
+2026-11-05 收敛（#6）：辅资料补充验证点（主表含「辅资料补充」标记）豁免需求关联 → WARN。
+"""
 import argparse
 import json
 import os
 import re
 import sys
 
-
-def read_text(path):
-    with open(path, encoding="utf-8-sig") as stream:
-        return stream.read()
-
-
-def parse_table(text, heading):
-    if not heading:
-        header, rows = None, []
-        for line in text.splitlines():
-            if line.startswith("##"):
-                break
-            if not line.strip().startswith("|"):
-                continue
-            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-            if all(re.fullmatch(r"[-: ]*", cell) for cell in cells):
-                continue
-            if header is None:
-                header = cells
-            else:
-                rows.append(cells)
-        return header, rows
-    lines = text.splitlines()
-    in_section = False
-    header = None
-    rows = []
-    for line in lines:
-        if line.startswith("##"):
-            if in_section and header is not None:
-                break
-            in_section = heading in line
-            header, rows = None, []
-            continue
-        if not in_section or not line.strip().startswith("|"):
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if all(re.fullmatch(r"[-: ]*", cell) for cell in cells):
-            continue
-        if header is None:
-            header = cells
-        else:
-            rows.append(cells)
-    return header, rows
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+from mdtable import parse_md_table, read_text  # noqa: E402  表格解析唯一实现
 
 
 def main():
@@ -67,13 +33,13 @@ def main():
         baseline = json.load(stream)
     tp_text = read_text(args.tp_file)
     tc_text = read_text(args.tc_file) if args.tc_file else ""
-    tp_header, tp_rows = parse_table(tp_text, "")
-    tc_header, tc_rows = parse_table(tc_text, "") if tc_text else (None, [])
+    tp_header, tp_rows = parse_md_table(tp_text, "")
+    tc_header, tc_rows = parse_md_table(tc_text, "") if tc_text else (None, [])
     tp_ids = {r[0] for r in tp_rows if r and re.fullmatch(r"TP-\d{3}", r[0])}
     tc_ids = {r[0] for r in tc_rows if r and re.fullmatch(r"TC-\d{3}", r[0])}
     failures = []
 
-    req_header, req_rows = parse_table(tp_text, "需求→测试点覆盖表")
+    req_header, req_rows = parse_md_table(tp_text, "需求→测试点覆盖表")
     if not req_rows:
         failures.append("测试点清单缺少「需求→测试点覆盖表」")
     else:
@@ -106,7 +72,23 @@ def main():
         for req_id in links:
             if req_id not in known_req_ids:
                 failures.append(f"覆盖表中的需求不在基线中: {req_id}")
-        for tp_id in sorted(tp_ids - covered_tps):
+        # 2026-11-05 收敛：辅资料补充验证点豁免需求关联（resolve: 与其语义牵强地伪挂靠，
+        # 不如明说"此验证点来自辅资料、无基线户口"）。
+        # 豁免条件：TP 主表行中包含「辅资料补充」标记（spec 定义的归属声明），仅 WARN 不 FAIL。
+        warnings = []
+        uncovered = sorted(tp_ids - covered_tps)
+        fail_uncovered, aux_uncovered = [], []
+        for tp_id in uncovered:
+            tp_row = next((r for r in tp_rows if r and r[0] == tp_id), [])
+            if any("辅资料补充" in cell for cell in tp_row):
+                aux_uncovered.append(tp_id)
+            else:
+                fail_uncovered.append(tp_id)
+        if aux_uncovered:
+            warnings.append(
+                f"辅资料补充验证点（豁免需求关联，留痕采信）: {' '.join(aux_uncovered)}"
+            )
+        for tp_id in fail_uncovered:
             failures.append(f"测试点 {tp_id} 未关联到任何需求基线条目")
 
     # TC 关联字段支持逗号分隔的多个 TP；详细有效性也由 verify_test_cases.py 检查。
@@ -131,6 +113,8 @@ def main():
         if args.tc_file:
             summary += f"、{len(tc_ids)} 条用例"
         print(f"[PASS] {summary} 的追溯关系完整")
+    for warning in warnings:
+        print(f"[WARN] {warning}")
     print(f"========== 校验汇总: PASS={0 if failures else 1} FAIL={len(failures)} ==========")
     return 1 if failures else 0
 

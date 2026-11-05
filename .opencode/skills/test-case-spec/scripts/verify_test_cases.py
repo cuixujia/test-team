@@ -7,11 +7,11 @@
   3. 优先级取值 P0-P3
   4. 关联TP 引用完整性（必须存在于测试点清单）
   5. 覆盖对照表存在；已验收 TP 全覆盖，未覆盖须写明原因
-  6. 标签列结构：至少含「所属业务功能」键；取值非空时须逐字命中 PRD
+  6. 标签列结构：含「所属业务功能」键；取值非空时须逐字命中 PRD；仅该键允许按规范留空（PRD 无功能矩阵项时）
   7. 交付物中不得出现业务功能编号
 
 用法：
-  python3 verify_test_cases.py <测试用例清单> [--tp-file <测试点清单>] [--prd-dir <PRD目录>] [--scope-list <任务功能清单>]
+  python3 verify_test_cases.py <测试用例清单> [--tp-file <测试点清单>] [--prd-dir <资料目录>] [--scope-list <任务功能清单>]
 
 退出码：0 = 通过；1 = 存在 FAIL；2 = 用法错误
 """
@@ -19,6 +19,11 @@ import os
 import re
 import sys
 import argparse
+
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+from mdtable import parse_first_table, parse_md_table, norm_space_all as norm, read_text  # noqa: E402
 
 FAILS = []
 PASSES = []
@@ -34,62 +39,9 @@ def ok(m):
     print(f"[PASS] {m}")
 
 
-def read_text(path):
-    for enc in ("utf-8", "utf-8-sig", "gbk"):
-        try:
-            with open(path, "r", encoding=enc) as f:
-                return f.read()
-        except UnicodeDecodeError:
-            continue
-    raise RuntimeError(f"无法解码: {path}")
-
-
-def parse_md_table(text, keyword):
-    """返回 (表头行, 数据行列表)。
-
-    - keyword 非空：只取标题含 keyword 的 ## 章节下的第一张表。
-    - keyword 为空：取全文中**第一个 ## 章节之前**的主表（若无 ##，则取第一张表）。
-    """
-    header, rows = None, []
-    if keyword:
-        in_sec = False
-        for line in text.split("\n"):
-            if line.startswith("##"):
-                in_sec = keyword in line
-                header, rows = None, []
-                continue
-            if not in_sec:
-                continue
-            s = line.strip()
-            if not s.startswith("|"):
-                continue
-            cells = [c.strip() for c in s.strip("|").split("|")]
-            if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-                continue
-            if header is None:
-                header = cells
-                continue
-            rows.append(cells)
-        return header, rows
-
-    # 主表：第一个 ## 之前
-    for line in text.split("\n"):
-        if line.startswith("##"):
-            break
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-            continue
-        if header is None:
-            header = cells
-            continue
-        rows.append(cells)
-    return header, rows
-def norm(s):
-    """空白规范化（保留引号等字符——不做引号归一，引号漂移要能被抓到）。"""
-    return re.sub(r"[\s　]+", "", s)
+def warn(m):
+    # 降级提示（跳过校验/范围收窄等），不计入 FAIL——2026-11-04 修复：此前未定义导致 NameError 崩溃
+    print(f"[WARN] {m}")
 
 
 def split_tp_refs(value):
@@ -97,8 +49,59 @@ def split_tp_refs(value):
     return [item.strip() for item in re.split(r"[,，、]", value) if item.strip()]
 
 
+def scope_list_prd_files(scope_text):
+    """从任务功能清单提取「来源 PRD 文件」集合（2026-11-05 契约修复）。
+
+    契约（见 prd-record-spec SKILL「scope-list 机器契约」）：scope-list 的
+    「资料角色登记」表首列名为「文件」，登记各资料文件；本函数在该表中取
+    所有 .md/.markdown/.txt/.csv 结尾的文件名。
+    按具名列解析，不再按"第一张表第 3 列"猜测旧结构。
+    """
+    found = set()
+    import re as _re
+    cur_cols, cur_rows = None, []
+    blocks = []
+
+    rows_acc = []
+    header_acc = None
+    for line in scope_text.split("\n"):
+        s = line.strip()
+        if s.startswith("|"):
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            if all(_re.fullmatch(r"[-: ]*", c) for c in cells):
+                continue
+            if header_acc is None:
+                header_acc = cells
+                continue
+            rows_acc.append(cells)
+        else:
+            if header_acc is not None:
+                blocks.append((header_acc, rows_acc))
+            header_acc, rows_acc = None, []
+    if header_acc is not None:
+        blocks.append((header_acc, rows_acc))
+
+    def normc(x):
+        return norm(x.strip("` *"))
+
+    for header, rows in blocks:
+        if not header:
+            continue
+        first = normc(header[0]) if header else ""
+        if first == "文件":  # 资料角色登记表契约列
+            for r in rows:
+                if r and r[0].lower().endswith(_PRD_EXTS):
+                    found.add(os.path.basename(r[0].strip()))
+    return found
+
+
 # ---- 资料读取：纯文本（md/markdown/txt/csv），docx/图片等非文本件在入库仪式即拦截 ----
-PRD_EXTS = (".md", ".markdown", ".txt", ".csv")
+_PRD_EXTS = (".md", ".markdown", ".txt", ".csv")
+PRD_EXTS = _PRD_EXTS
+
+
+# parse_md_table / parse_first_table / norm / read_text / split_tp_refs 的唯一实现在
+# .opencode/skills/_lib/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
 
 
 def load_prd_texts(prd_dir):
@@ -138,40 +141,6 @@ def load_file_texts(prd_dir):
             files[fn] = norm(t)
     return files
 
-
-
-def parse_first_table(text):
-    """返回 (表头行, 数据行列表)——取文档中第一张表。
-
-    兼容两种写法：
-      A. 表在某个 ## 章节下 → 取该章节的第一张表
-      B. 表直接跟在 H1 下（无 ## 章节）→ 取全文第一张表
-    """
-    rows_all = []
-    header = None
-    seen_section = False
-    in_first_section = False
-    first_section_done = False
-    for line in text.split("\n"):
-        if line.startswith("##"):
-            if seen_section:
-                break
-            seen_section = True
-            in_first_section = True
-            continue
-        if not seen_section and line.startswith("#"):
-            continue
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if all(re.fullmatch(r"[-: ]*", c) for c in cells):
-            continue
-        if header is None:
-            header = cells
-            continue
-        rows_all.append(cells)
-    return header, rows_all
 
 def main():
     ap = argparse.ArgumentParser()
@@ -314,6 +283,8 @@ def main():
             ok("用例关联与测试点→用例对照表一致")
 
     # 6) 标签结构与取值
+    #   规范（test-case-spec「标签规范」）：所属业务功能在 PRD 无对应功能矩阵项（如非功能约束）时允许留空；
+    #   其余键值不得为空；非空值不得使用占位词（无/待定/N/A 等）。
     for r in main_rows:
         lab = r[9] if len(r) > 9 else ""
         if not lab:
@@ -329,9 +300,10 @@ def main():
             if k not in ("所属系统", "所属业务活动", "所属业务功能"):
                 fail(f"{r[0]} 标签键非法: {k}")
             if not v:
-                fail(f"{r[0]} 标签「{k}」值为空(应留空则整项省略,不得写占位词)")
-                if v in ("无", "待定", "N/A", "待补充", "-", "—"):
-                    fail(f"{r[0]} 标签「{k}」使用了占位词: {v}")
+                if k != "所属业务功能":
+                    fail(f"{r[0]} 标签「{k}」值为空(仅「所属业务功能」允许按规范留空)")
+            elif v in ("无", "待定", "N/A", "待补充", "-", "—"):
+                fail(f"{r[0]} 标签「{k}」使用了占位词: {v}")
     if not any("标签" in m for m in FAILS):
         ok("标签结构校验通过")
 
@@ -342,10 +314,11 @@ def main():
         prd_files = set()
         if args.scope_list and os.path.isfile(args.scope_list):
             st0 = read_text(args.scope_list)
-            _sh0, srows0 = parse_first_table(st0)
-            for row in srows0:
-                if row and len(row) > 2 and row[2]:
-                    prd_files.add(os.path.basename(row[2].strip()))
+            # 2026-11-05 契约修复：按「资料角色登记」表首列（列名「文件」）取资料文件，
+            # 不再按旧结构"第一张表第 3 列"猜测；不匹配时回退全目录比对并 WARN。
+            prd_files = scope_list_prd_files(st0)
+            if not prd_files:
+                warn("任务功能清单「资料角色登记」表未解析到资料文件，退回全目录比对")
         scoped_note = ""
         if prd_files:
             whitelist = [files_map[f] for f in sorted(prd_files) if f in files_map]

@@ -26,7 +26,9 @@ TEXT_EXTS = (".md", ".markdown", ".txt", ".csv")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+)*)(?:[、.． ]+)(.{1,80})$")
 ID_TOKEN_RE = re.compile(
-    r"(?<![A-Za-z0-9])(?:FUNC|BR|GOAL|EXCL|NFR|MOD|REQ|VER|SRS|BF|CL)[-\d][0-9A-Za-z\-]*|(?:F|E-EX)\d{1,3}\b"
+    # 2026-11-04 修复：支持 E- 前缀完整捕获（如 E-BR01/E-CL-001）；lookbehind 加 "-"，
+    # 防止 E-BR01 被重复匹配为 BR01（此前索引与文档编号对不上）。
+    r"(?<![A-Za-z0-9-])(?:E-)?(?:FUNC|BR|GOAL|EXCL|NFR|MOD|REQ|VER|SRS|BF|CL)[-\d][0-9A-Za-z\-]*|(?:F|E-EX)\d{1,3}\b"
 )
 
 
@@ -84,7 +86,7 @@ def render(sources, ids_only):
 def render_manifest(sources):
     """指纹清单（python 侧 sha256，与机验管线同口径）。
     产物同时供人工检查与需求基线 input_files 字段复制。"""
-    out = ["# files-manifest（V2 指纹清单）", "", "| 文件 | sha256 |", "|---|---|"]
+    out = ["# files-manifest（指纹清单）", "", "| 文件 | sha256 |", "|---|---|"]
     for s in sources:
         out.append(f"| {s['rel']} | {s['sha256']} |")
     out.append("")

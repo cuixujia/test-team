@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify a structured requirements baseline against the source text files.
 
-纯文本直引模式（V2 唯一流程）：--input-dir + input_files 指纹绑定，证据对原文件逐字比对。
+纯文本直引模式（唯一流程）：--input-dir + input_files 指纹绑定，证据对原文件逐字比对。
 规范见 ../SKILL.md。
 
 Baseline format (JSON):
@@ -18,10 +18,19 @@ import json
 import os
 import re
 import sys
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+from mdtable import norm_quote as norm  # noqa: E402 主表逐字比对口径：引文归一（2026-11-05 收敛）
 
 
 VALID_STATUS = {"confirmed", "needs_clarification", "out_of_scope"}
 VALID_RISK = {"P0", "P1", "P2", "P3"}
+
+# 澄清记录解析口径（2026-11-05 收敛）：**行首**（允许表格竖线/引用前缀）必须是 CL-编号，
+# 该行才登记为该 CL 的专属记录行——正文/留痕行中提到的 CL 编号不再污染登记表
+# （2026-11-05 实测：留痕行首 CL 编号覆盖专属行导致摘录比对假 FAIL）。
+CL_ROW_RE = re.compile(r"^\s*(?:\|[>]*\s*)?CL-\d{3}\b")
 
 
 def load_json(path):
@@ -29,8 +38,7 @@ def load_json(path):
         return json.load(stream)
 
 
-def norm(text):
-    return "".join(text.split())
+# norm 已由 _lib.mdtable 提供（norm_quote：空白单格化+标点折叠+转义还原——与 verify_quotes 同口径）
 
 
 def clarification_rows(path):
@@ -40,9 +48,10 @@ def clarification_rows(path):
         text = stream.read()
     rows = {}
     for line in text.splitlines():
-        match = re.search(r"\b(CL-\d+)\b", line)
-        if match:
-            rows[match.group(1)] = line
+        if CL_ROW_RE.match(line):
+            m = re.search(r"CL-\d{3}", line)
+            if m:
+                rows[m.group(0)] = line
     return rows
 
 
@@ -154,7 +163,8 @@ def main():
                     errors.append(f"{rid}: 单条证据不能同时引用 PRD 和澄清")
                 elif clarification_id not in cl_map:
                     errors.append(f"{rid}: 澄清证据不存在或未提供澄清记录 ({clarification_id})")
-                elif not quote or norm(quote) not in norm(cl_map[clarification_id]):
+                elif quote and norm(quote) not in norm(cl_map[clarification_id]):
+                    # 2026-11-05 收敛：澄清证据必填项 = 编号本身；quote 为可选的指向性摘录（比对按归一口径）。
                     errors.append(f"{rid}: 澄清证据摘录与记录不一致 ({clarification_id})")
                 continue
             # 证据：{"file", "lines", "quote"} 对原文件逐字比对

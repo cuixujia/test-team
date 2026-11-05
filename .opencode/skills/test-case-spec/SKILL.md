@@ -73,6 +73,41 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 
 > **列序为校验契约**，`scripts/verify_test_cases.py` 按此解析，禁止调整。
 
+### 机器契约（`<!-- CONTRACT -->`，校验器一致性单测的对照源）
+
+<!-- CONTRACT-BEGIN: test-case-spec -->
+- **主表定位主契约**：测试用例主表 = 清单文件中**第一个 `##` 之前的唯一表格**。
+- **章节标题含「测试用例主表」**仅为查看视图管线（export_tables）的可选择性增强；缺失时按主契约回退，不是必需结构。
+- 主表列序 = 模板表头原文：`编号 | 标题 | 关联TP | 优先级 | 前置条件 | 测试数据 | 操作步骤 | 预期结果 | 用例类型 | 标签`。
+- 覆盖对照表章节标题含：`覆盖对照表`（列序：TP编号 | 覆盖的 TC 编号 | 未覆盖原因）。
+- TC 编号正则：`TC-\d{3}`；优先级枚举：P0/P1/P2/P3；用例类型枚举：正向/反向/边界/异常/流程。
+- 标签键枚举：`所属系统`/`所属业务活动`/`所属业务功能`（取值来源见标签规范；值须逐字命中 PRD）。
+- 标签命中范围：校验器从 `state/scope-list.md`「资料角色登记」表（首列列名=`文件`）读取资料文件白名单——scope-list 机器契约见 `prd-record-spec` SKILL。
+- 校验统一入口：`check.py --phase tc|full`（内部承接 TP/TC 清单**各自**的引文逐字、基线、TC 结构、端到端追溯）；禁止引用被收敛的 `validate_delivery.py`。
+<!-- CONTRACT-END: test-case-spec -->
+
+> 表格解析唯一实现在 `.opencode/skills/_lib/mdtable.py`；`scripts/verify_test_cases.py` 从其导入。
+
+## 派生数据视图（test-case-table.md，只读投影）
+
+权威数据始终是本清单主件。视图由**经理**在机验 PASS 后用 `export_tables.py --phase tc` 派生，**仅作呈现给用户看的视野**，不做语义质检、不进确认关口：
+
+- **视图文件只包含一张表**（无标题、无引语），列为以下 14 列；是主件「标签」列三键拆列+TP 意图回填的**纯映射**：
+
+| 用例编号 | 标题 | 关联TP | 测试点验证意图 | 优先级 | 用例类型 | 前置条件 | 测试数据 | 操作步骤 | 预期结果 | 所属系统 | 业务活动 | 业务功能 | 依据（主TP） |
+
+- 测试点验证意图 = 主 TP（`关联TP` 首个）的验证意图，按 `--tp-file` 给出的测试点清单回填；主 TP 不存在则留空并 WARN。
+- 所属系统 / 业务活动 / 业务功能 = 主件「标签」列三键拆列，缺键按标签规范留空。
+- 依据（主TP） = 主 TP 依据的指针级串（`文件:行号`、`CL-xxx`）。
+- **映射时效**：主件变更即视图失效——机验 PASS 后重跑 `export_tables.py`，数据自动跟随主件刷新。
+
+```bash
+python3 .opencode/skills/test-point-spec/scripts/export_tables.py --phase tc \
+  --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
+```
+
+行数与编号集合同主表自洽（脚本内置断言，不一致 exit 1）。
+
 ## 输入与历史测试用例使用规则
 
 阶段 10 的输入以派发单与阶段 8 资料质检报告为准：
@@ -86,7 +121,7 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 ## 交付约束
 
 - 最终交付的测试用例清单中**不得出现业务功能编号**——归属信息通过标签列表达。
-- 交付前运行 `test-point-spec/scripts/validate_delivery.py --phase tc`；最终交付前再运行 `--phase full`，机器报告通过且指纹未变后方可交付。
+- 交付前运行 `test-point-spec/scripts/check.py --phase tc`；最终交付前再运行 `--phase full`，机器报告通过且指纹未变后方可交付。TC 清单引文逐字校验已内置于管线（quote-tc 步骤，报告工件加 `.quotes-tc.json`）。
 
 ## 变更规则
 
