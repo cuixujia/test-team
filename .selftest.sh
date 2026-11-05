@@ -45,10 +45,10 @@ perm_block .opencode/agents/test-manager.md | grep -q 'output/tp\|output/tc\|out
 
 echo
 echo "========== 3. Skill 与脚本完整性（V2 唯一，无旧版遗留） =========="
-for s in test-knowledge prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec; do
+for s in test-knowledge prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec test-script-lib; do
   [ -f ".opencode/skills/$s/SKILL.md" ] && ok "skill $s" || ng "skill $s 缺失"
 done
-for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/check.py .opencode/skills/_lib/mdtable.py; do
+for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/check.py .opencode/skills/test-script-lib/scripts/mdtable.py; do
   [ -f "$f" ] && ok "$(basename "$f")" || ng "$(basename "$f") 缺失"
 done
 for f in build_source_catalog.py verify_source_catalog.py verify_anchors.py; do
@@ -242,6 +242,30 @@ PY
 python3 "$VP" "$TP" --input-dir "$PRD" --scope-list "$S/state/scope-list.md" >/dev/null 2>&1 && ng "引用 CL 无澄清记录未被捕获" || ok "引用 CL 却未提供 --clarifications 被捕获"
 cp /tmp/_tp.cl.bak "$TP"
 rm -f /tmp/_tp.cl.bak
+
+# 5.17 机验失败输出口径（「机验转述纪律」的机械保险丝，2026-11-05）：
+# check.py FAIL 输出必须含三要素锚点——[FAIL] 步骤行 / [REPORT] 工件行 / 校验汇总: FAIL；
+# 内容由报告工件结构化承载，供经理按「编号+违反什么+谁修」向用户转述，不必贴原始报错
+if [ -f /tmp/_base.bak ]; then
+cp /tmp/_base.bak "$BASE"
+python3 - <<'PY'
+import json
+p='workspace/runtime_demo/file/sess-demo-0001/scope/requirements-baseline.json'
+b=json.load(open(p,encoding='utf-8'))
+req=next(r for r in b['requirements'] if r['id']=='REQ-001')
+req['evidence'][0]['quote']='风险等级分为高中低三档。'
+json.dump(b,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
+PY
+OUT=$(python3 "$VB" "$BASE" --input-dir "$PRD" --freeze 2>&1)
+echo "$OUT" | grep -q '^\[FAIL\]' && ok "机验失败输出含 [FAIL] 步骤行" || ng "机验失败输出缺 [FAIL] 步骤行"
+echo "$OUT" | grep -q '^\[REPORT\]' && ok "机验失败输出含 [REPORT] 工件行" || ng "机验失败输出缺 [REPORT] 工件行"
+echo "$OUT" | grep -q '校验汇总: FAIL$' && ok "机验失败输出含「校验汇总: FAIL」锚点" || ng "机验失败输出缺汇总锚点"
+grep -Eq '"label"' "$(echo "$OUT" | sed -n 's/^\[REPORT\] //p' | head -1)" && ok "机验报告工件结构化承载失败明细（steps.label）" || ng "报告工件缺结构化失败明细"
+cp /tmp/_base.bak "$BASE"
+else
+ng "5.17 跳过：fixture 缺失（/tmp/_base.bak 不存在）"
+fi
+
 
 echo
 echo "========== 6. 全链交付校验（check full + 报告指纹）=========="

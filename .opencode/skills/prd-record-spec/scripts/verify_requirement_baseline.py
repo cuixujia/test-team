@@ -20,7 +20,7 @@ import re
 import sys
 import sys as _sys
 import os as _os
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import norm_quote as norm  # noqa: E402 主表逐字比对口径：引文归一（2026-11-05 收敛）
 
 
@@ -38,7 +38,7 @@ def load_json(path):
         return json.load(stream)
 
 
-# norm 已由 _lib.mdtable 提供（norm_quote：空白单格化+标点折叠+转义还原——与 verify_quotes 同口径）
+# norm 已由 test-script-lib/mdtable.py 提供（norm_quote：空白单格化+标点折叠+转义还原——与 verify_quotes 同口径）
 
 
 def clarification_rows(path):

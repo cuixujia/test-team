@@ -22,7 +22,7 @@ import argparse
 
 import sys as _sys
 import os as _os
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import parse_first_table, parse_md_table, norm_space_all as norm, read_text  # noqa: E402
 
 FAILS = []
@@ -101,7 +101,7 @@ PRD_EXTS = _PRD_EXTS
 
 
 # parse_md_table / parse_first_table / norm / read_text / split_tp_refs 的唯一实现在
-# .opencode/skills/_lib/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
+# .opencode/skills/test-script-lib/scripts/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
 
 
 def load_prd_texts(prd_dir):

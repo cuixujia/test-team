@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2026-11-05 复盘收敛回归：引文表示法归一、摘录自愈、CL 专属行、辅资料豁免、增量机验。
 
-对应改造（零新增脚本，仅改 _lib/mdtable.py、verify_quotes.py、verify_requirement_baseline.py、
+对应改造（零新增脚本，仅改 test-script-lib/scripts/mdtable.py、verify_quotes.py、verify_requirement_baseline.py、
 verify_test_points.py、verify_traceability.py、check.py）：
   A. norm_quote：全/半角标点+引号形制+Markdown 转义归一——表示法差异不再 FAIL
   B. --autofix：行号正确且骨架命中 → 按行号回读原文回填（产物唯一出现时原位回写）

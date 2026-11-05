@@ -104,7 +104,7 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 - 校验统一入口：`check.py --phase tp|full`（内部承接引文逐字、基线、TP 结构、需求→TP 追溯）；禁止在派发单/文档中引用被收敛的 `validate_delivery.py`。
 <!-- CONTRACT-END: test-point-spec -->
 
-> 表格解析的唯一实现在 `.opencode/skills/_lib/mdtable.py`；`scripts/verify_test_points.py` 与 `scripts/export_tables.py` 从其导入，任何本地副本均为违规（`tests/test_contract_sync.py` 断言契约块与脚本常量一致）。
+> 表格解析的唯一实现在 `.opencode/skills/test-script-lib/scripts/mdtable.py`；`scripts/verify_test_points.py` 从其导入，任何本地副本均为违规（`tests/test_contract_sync.py` 断言契约块与脚本常量一致）。
 
 ## 派生数据视图（test-point-table.md，只读投影）
 

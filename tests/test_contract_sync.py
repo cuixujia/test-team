@@ -3,7 +3,7 @@
 
 锁定三条不变量，防止"SKILL 文档说的"与"脚本做的"再次漂移（复盘 C 类根因）：
   1. SKILL 机器契约块中声明的章节关键词/列序，与脚本源码中的硬编码常量逐一等值；
-  2. 表格解析唯一实现在 _lib/mdtable.py——任何校验脚本不得再定义本地副本；
+  2. 表格解析唯一实现在 test-script-lib/scripts/mdtable.py——任何校验脚本不得再定义本地副本；
   3. 被收敛的旧入口（validate_delivery.py / verify_validation_report.py）已物理删除，
      且 .opencode/** 与 README/AgentDesign 中无残留引用。
 
@@ -74,18 +74,21 @@ class TestContractSync(unittest.TestCase):
         self.assertIn("第一个 `##` 之前", block)
         self.assertIn("可选择性增强", block, "契约块应说明「测试点主表」仅为增强")
 
-    # —— _lib 唯一实现 ——
+    # —— test-script-lib 唯一实现 ——
     def test_shared_lib_is_single_implementation(self):
         consumers = [
             os.path.join(SKILLS, "test-point-spec", "scripts", "verify_test_points.py"),
-            os.path.join(SKILLS, "test-point-spec", "scripts", "export_tables.py"),
+            os.path.join(SKILLS, "test-point-spec", "scripts", "verify_traceability.py"),
+            os.path.join(SKILLS, "test-point-spec", "scripts", "check.py"),
             os.path.join(SKILLS, "test-case-spec", "scripts", "verify_test_cases.py"),
+            os.path.join(SKILLS, "prd-record-spec", "scripts", "verify_requirement_baseline.py"),
+            os.path.join(SKILLS, "prd-record-spec", "scripts", "verify_quotes.py"),
         ]
         for path in consumers:
             src = read(path)
             self.assertNotIn("def parse_md_table(", src, f"本地 parse_md_table 副本违规: {path}")
             self.assertNotIn("def parse_first_table(", src, f"本地 parse_first_table 副本违规: {path}")
-        lib = read(os.path.join(SKILLS, "_lib", "mdtable.py"))
+        lib = read(os.path.join(SKILLS, "test-script-lib", "scripts", "mdtable.py"))
         self.assertIn("def parse_md_table(", lib)
         self.assertIn("def parse_first_table(", lib)
 

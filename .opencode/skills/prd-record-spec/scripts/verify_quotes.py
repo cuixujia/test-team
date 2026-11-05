@@ -3,7 +3,7 @@ r"""verify_quotes.py — 引文逐字机验（溯源规范 V2：文件:行号 �
 
 对引用表逐条验证：给定的「摘录原文 + 来源文件 + 行号」确实存在于原文件该行。
 2026-11-05 复盘收敛后的判定口径（行号=定位锚点，逐字=内容事实）：
-  1. 比对双侧先经 _lib.mdtable.norm_quote 归一：空白单格化、Markdown 表格 `\|`
+  1. 比对双侧先经 test-script-lib/mdtable.py norm_quote 归一：空白单格化、Markdown 表格 `\|`
      转义还原、全/半角标点与引号形制折叠——**表示法差异不再 FAIL，人零参与**；
   2. 摘录字符缺失/误植但 行号指向正确 且 内容骨架（去空白去标点）可命中 →
      自动按行号回读原文回填摘录（--autofix 时回写清单文件），留痕由报告工件自动
@@ -37,7 +37,7 @@ import sys
 
 import sys as _sys
 import os as _os
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import norm_quote as norm  # noqa: E402  引文归一唯一实现（2026-11-05 收敛）
 
 # 从任意 Markdown 清单抽取引用的语法：`<文件名>:L<行号或区间>「<摘录>」`

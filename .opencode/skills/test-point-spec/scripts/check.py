@@ -77,7 +77,7 @@ def revalidate_report(report_path):
 # 汇总为 证据→TP 数据视图。零新增脚本，归属 check.py 内建推导步骤。
 import sys as _sys
 import os as _os
-_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import parse_md_table  # noqa: E402
 
 DCITE_RE = re.compile(

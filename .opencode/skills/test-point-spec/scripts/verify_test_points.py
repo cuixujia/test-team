@@ -28,7 +28,7 @@ import argparse
 
 import sys as _sys
 import os as _os
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import parse_first_table, parse_md_table, read_text, sha256_file as sha256_of  # noqa: E402
 
 FAILS = []
@@ -55,7 +55,7 @@ def warn(m):
 
 
 # parse_md_table / parse_first_table / norm / read_text / sha256_of 已收敛至
-# .opencode/skills/_lib/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
+# .opencode/skills/test-script-lib/scripts/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
 
 
 # 直引证据（文件:行号+原话，唯一 PRD 证据格式，见 prd-record-spec/SKILL.md）

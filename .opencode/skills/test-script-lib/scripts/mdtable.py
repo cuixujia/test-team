@@ -1,8 +1,8 @@
-"""_lib/mdtable.py — 清单脚本共享的 Markdown 表格解析与基础工具（单一实现，2026-11-05 收敛）。
+"""test-script-lib/scripts/mdtable.py — 清单脚本共享的 Markdown 表格解析与基础工具（单一实现，2026-11-05 收敛；2026-11-05 迁入 test-script-lib skill）。
 
 背景（复盘 2026-11-04/05）：verify_test_points.py、verify_test_cases.py、export_tables.py、
 verify_traceability.py 各自维护一份语义相近但不完全相同的表格解析副本，是"契约散落、
-漂移不可见"的主要来源。本模块为唯一实现，各脚本从 `.._lib` 导入，禁止再写本地副本。
+漂移不可见"的主要来源。本模块为唯一实现，各脚本从 `../../test-script-lib/scripts` 导入，禁止再写本地副本。
 
 注意：`norm_space_all`（TP/TC 清单校验口径：删除全部空白）与 `norm_ws_single`
 （引文机验口径：空白规范化为单空格）是**两个既有口径**，不得混用，也不得互相"统一"。

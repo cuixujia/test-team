@@ -86,7 +86,7 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 校验统一入口：`check.py --phase tc|full`（内部承接 TP/TC 清单**各自**的引文逐字、基线、TC 结构、端到端追溯）；禁止引用被收敛的 `validate_delivery.py`。
 <!-- CONTRACT-END: test-case-spec -->
 
-> 表格解析唯一实现在 `.opencode/skills/_lib/mdtable.py`；`scripts/verify_test_cases.py` 从其导入。
+> 表格解析唯一实现在 `.opencode/skills/test-script-lib/scripts/mdtable.py`；`scripts/verify_test_cases.py` 从其导入。
 
 ## 派生数据视图（test-case-table.md，只读投影）
 

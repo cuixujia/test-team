@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check requirement -> TP -> TC links across the approved baseline and lists.
 
-2026-11-05 收敛（B1）：表格解析迁移至 _lib/mdtable.parse_md_table 唯一实现，
+2026-11-05 收敛（B1）：表格解析迁移至 test-script-lib/mdtable.parse_md_table 唯一实现，
 删除本地 parse_table 副本（契约散落回点）。
 2026-11-05 收敛（#6）：辅资料补充验证点（主表含「辅资料补充」标记）豁免需求关联 → WARN。
 """
@@ -13,7 +13,7 @@ import sys
 
 import sys as _sys
 import os as _os
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "_lib"))
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "test-script-lib", "scripts"))
 from mdtable import parse_md_table, read_text  # noqa: E402  表格解析唯一实现
 
 
