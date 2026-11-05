@@ -289,6 +289,16 @@ done
 [ -f "工作空间目录结构.md" ] && ok "工作空间目录结构.md" || ng "工作空间目录结构.md 缺失"
 
 echo
+echo "========== 9. 知识聚焦（references 无流程/输出包装句）=========="
+for f in .opencode/skills/test-knowledge/references/*.md; do
+  if grep -qE 'Agent 接到|Agent 拿到|AI 测试 Agent|Agent 生成|Agent 参考|思维导图|记入资料质检报告|适用时机：阶段' "$f"; then
+    ng "知识文件含流程/输出包装句: $f"
+  else
+    ok "知识聚焦: $(basename "$f")"
+  fi
+done
+
+echo
 echo "=========================================="
 echo "通过 $PASS 项，失败 $FAIL 项"
 [ "$FAIL" -eq 0 ] || exit 1

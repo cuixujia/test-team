@@ -14,7 +14,7 @@
 
 ## 知识库（唯一语义判据）
 
-测试语义判定的唯一权威在 `.opencode/skills/test-knowledge/`：四份**原文**（①通用测试方法论、②测试维度定义、③通用测试规则、④测试点生成指南，只读不改）+ 两份**补充件**（TP 切分与命名判别、领域专项检查单）。各 skill 只引用不复述；口径冲突时**以知识库为准**（改 skill，不改知识）。调优路径：改补充件，或经用户决定整体替换原文。导入原始版本留存于仓库根 `测试知识/`（只读存档）。
+测试语义判定的唯一权威在 `.opencode/skills/test-knowledge/`：四份**原文**（①通用测试方法论、②测试维度定义、③通用测试规则、④测试点生成指南；行文中的流程/输出包装已裁剪，只留判定标准）+ 两份**补充件**（TP 切分与命名判别、领域专项检查单）。各 skill 只引用不复述；口径冲突时**以知识库为准**（改 skill，不改知识）。调优路径：改补充件，或经用户决定整体替换原文。导入原始版本留存于仓库根 `测试知识/`（只读存档）。
 
 ## 资料约定（唯一流程）
 
@@ -29,12 +29,12 @@
 4. **资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单落盘 `output/reports/tp-input-check.md`；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
 5. **集中澄清**：QA 澄清候选与基线占位合并一次询问；结论登记 `CL-xxx`。**影响 TP 判定的澄清闭环后，TP 才生成**（仅影响 TC 数据构造的缺件项登记即可放行）。
 6. **生成测试点（阶段 5 尾）**：设计专家基于落盘基线、CL 结论与阶段 3 报告生成测试点。
-7. **机验+用户确认**：`verify_quotes.py` 引文逐字机验 + 覆盖表校验 + 独立语义质检通过后，由用户确认测试点（确认即代基线联签冻结），并生成测试点数据视图 `test-point-table.md`。
+7. **机验+出表+用户确认**：`check.py --phase tp` 机验 PASS 后，经理**立即**生成测试点数据视图 `test-point-table.md`，**以 table 为载体**交语义质检与用户确认（确认即代基线联签冻结）；确认时的删改意见由经理映射回主件、修订后重导 table。
 8. **用例资料质检（阶段 8，先行）**：检查开发设计主资料可测性与缺件，报告落盘 `output/reports/tc-input-check.md`；缺件经澄清闭环或让步留痕后用例分支才启动。
-9. **生成 TC（阶段 10）**：基于确认 TP、阶段 8 结论和开发设计主资料生成；机器校验和独立语义质检（引用只机验+定向抽查）通过后由用户确认，并生成用例数据视图 `test-case-table.md`。
-10. **修复与变更**：按问题 ID 和追溯关系增量修复，最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
+9. **生成 TC（阶段 10）**：基于确认 TP、阶段 8 结论和开发设计主资料生成；`check.py --phase full` 全量机验 PASS 后经理先出 `test-case-table.md`，再以 table 载体交语义质检与用户确认。
+10. **修复与变更**：按问题 ID 和追溯关系增量修复（修复单一次性打包，见 AgentDesign 质检收敛），最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
 
-用户正式确认只有 TP 和 TC 两处。真正需要用户决策的问题必须等待，不能猜答案。
+用户正式确认只有 TP 和 TC 两处，载体均为 table 数据视图。真正需要用户决策的问题必须等待，不能猜答案。
 
 ## 核心产物
 
@@ -42,14 +42,15 @@
 scope/files-manifest.md            # 文本资料指纹清单（Python 侧 sha256）
 scope/outline.md                   # 轻扫描：标题树+规则编号索引
 scope/requirements-baseline.json   # 结构化需求、input_files 指纹、来源证据（文件:行号+原话）、风险与状态
-output/tp/test-point.md            # 含证据→TP、需求→TP 两张覆盖表（唯一权威）
-output/tp/test-point-table.md      # 测试点数据视图（仅一张表；export_tables.py 派生，呈现层，主件变更重导即刷新）
+output/tp/test-point.md            # 含需求→TP 覆盖表（唯一权威；证据→TP 由机验自动推导）
+output/tp/test-point-table.md      # 测试点数据视图（仅一张表；export_tables.py 派生，确认载体，主件变更重导即刷新）
 output/tc/test-case.md             # 含 TP→TC 覆盖表；TC 可关联主 TP 和相关 TP（唯一权威）
-output/tc/test-case-table.md       # 测试用例数据视图（仅一张表；呈现层，主件变更重导即刷新）
+output/tc/test-case-table.md       # 测试用例数据视图（仅一张表；确认载体，主件变更重导即刷新）
 output/reports/check-tp.json       # TP 机验报告（+ .quotes-tp.json：TP 引文逐字明细）
 output/reports/check-tc.json       # TC 机验报告（+ .quotes-tc.json：TC 引文逐字明细）
 output/reports/check-full.json     # 最终全量兜底结果
-output/reports/*-check.md          # 独立语义质检报告
+output/reports/*-check.md          # 独立语义质检报告（一条问题=一句事实一处证据）
+state/process-log.md               # 过程轻量留痕：单行一条「日期|阶段|结果|异常一句话」（经理独占写）
 ```
 
 ## 脚本

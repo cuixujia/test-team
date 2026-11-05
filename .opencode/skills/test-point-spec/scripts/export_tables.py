@@ -3,8 +3,8 @@
 
 视图规则（2026-11-04 决策）：
   - 主件唯一权威：output/tp/test-point.md / output/tc/test-case.md。
-    视图 test-point-table.md / test-case-table.md 仅作查看与筛选，不作为确认/质检对象、
-    不承载语义；每当局件变更且机验 PASS 后由**经理**重新生成。
+    视图 test-point-table.md / test-case-table.md 为用户可见的呈现层与确认载体（主件仍是唯一权威、
+    语义质检仍看主件）；机验 PASS 后、用户确认前由**经理**重新生成。
   - TP 视图表头：编号 | 验证意图 | 类型 | 依据 | 所属系统 | 业务活动 | 业务功能
     依据=指针级（文件:行号 / CL-xxx，用「、」连接），不做改写，保真以主件机验为准。
     归属解析链：需求→TP 覆盖表反查 TP→REQ → 基线 feature_id（取「（）」内名称）
@@ -91,6 +91,17 @@ def find_table(text, keyword=None):
     return ts[0]
 
 
+def locate_tp_master(text, context):
+    """TP 主表定位唯一契约（2026-11-05）：优先章节标题含「测试点主表」，
+    查不到即回退主契约（第一个 ## 之前的主表）——tp/tc 两分支同用本函数，
+    标题关键词只是提示，永不作为必要条件（2026-11-05 复盘：tc 分支曾因缺回退 KeyError）。"""
+    try:
+        return find_table(text, keyword="测试点主表")
+    except KeyError:
+        WARNED.append(f"TP 主件无「测试点主表」章节标题，按主契约（首个 ## 前主表）定位（{context}）")
+        return find_table(text, keyword=None)
+
+
 def split_ids(cell):
     return [x for x in re.split(r"[、，,;；\s]+", cell or "") if x]
 
@@ -158,12 +169,7 @@ def load_registry(scope_text):
 
 def export_tp(args):
     tp_text = read_text(args.tp_file)
-    try:
-        _, header, rows = find_table(tp_text, keyword="测试点主表")
-    except KeyError:
-        # 2026-11-05 契约收敛：主表定位主契约 = 第一个 ## 之前的表（与 verify_test_points 一致）；
-        # 章节标题含「测试点主表」仅为可选择性增强，查不到时回退主契约，不再让视图管线一票否决。
-        _, header, rows = find_table(tp_text, keyword=None)
+    _, header, rows = locate_tp_master(tp_text, "tp 分支")
     if rows and not any(re.fullmatch(r"TP-\d+", r[0]) for r in rows if r):
         # 兜底仍解析出非主表（如文件以说明表开头）→ 继续 keyword 提示 WB。
         WARNED.append("TP 视图：主契约定位到的首表未含 TP 行，请检查清单主表结构")
@@ -255,7 +261,7 @@ def export_tc(args):
         raise KeyError(f"TC 主表缺少契约字段：{'、'.join(missing)}")
 
     tp_text = read_text(args.tp_file)
-    _, tp_hdr, tp_rows = find_table(tp_text, keyword="测试点主表")
+    _, tp_hdr, tp_rows = locate_tp_master(tp_text, "tc 分支")
     tp2intent, tp2basis = {}, {}
     for r in tp_rows:
         if len(r) >= 5 and re.fullmatch(r"TP-\d+", r[0]):

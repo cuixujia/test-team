@@ -5,6 +5,7 @@
 - --phase tp：scope-list 缺「归属登记」表 → 归属留空 + WARN，仍生成（exit 0）
 - --phase tc：十字段主表解析、标签三键拆列、主 TP 验证意图与依据回填、主 TP 缺失 WARN
 - TC 主表缺契约字段 → exit 1
+- TP 主件无「测试点主表」章节标题 → tp/tc 两分支均按主契约回退定位（2026-11-05 复盘）
 """
 import json
 import os
@@ -124,6 +125,42 @@ class TestTpExport(unittest.TestCase):
         self.assertIn("[WARN] 依据 token 无法解析为指针", proc.stdout)
         self.assertIn("| TP-001 | 验证登录成功进入首页 | 功能 | 某无出处证据 | ",
                       open(self.out, encoding="utf-8").read())
+
+
+TP_MD_NO_TITLE = TP_MD.replace("## 测试点主表\n\n", "")
+
+
+class TestNoMasterTitleFallback(unittest.TestCase):
+    """TP 主件无「测试点主表」标题：tp/tc 均按主契约回退定位（2026-11-05 复盘 A5-A7）。"""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.tp = os.path.join(self.d, "test-point.md")
+        self.tc = os.path.join(self.d, "test-case.md")
+        self.base = os.path.join(self.d, "baseline.json")
+        self.scope = os.path.join(self.d, "scope-list.md")
+        write(self.tp, TP_MD_NO_TITLE)
+        write(self.tc, TC_MD)
+        write(self.scope, SCOPE_MD)
+        with open(self.base, "w", encoding="utf-8") as f:
+            json.dump(BASELINE, f, ensure_ascii=False)
+
+    def test_tp_phase_exports_without_title(self):
+        out = os.path.join(self.d, "tp-table.md")
+        proc = run("--phase", "tp", "--tp-file", self.tp, "--baseline", self.base,
+                   "--scope-list", self.scope, "--output", out)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("[WARN] TP 主件无「测试点主表」章节标题", proc.stdout)
+        text = open(out, encoding="utf-8").read()
+        self.assertIn("| TP-001 | 验证登录成功进入首页 | 功能 | prd.md:10 |", text)
+
+    def test_tc_phase_exports_without_tp_title(self):
+        out = os.path.join(self.d, "tc-table.md")
+        proc = run("--phase", "tc", "--tc-file", self.tc, "--tp-file", self.tp, "--output", out)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("[WARN] TP 主件无「测试点主表」章节标题", proc.stdout)
+        text = open(out, encoding="utf-8").read()
+        self.assertIn("验证登录成功进入首页", text)
 
 
 class TestTcExport(unittest.TestCase):
