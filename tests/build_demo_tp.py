@@ -52,7 +52,7 @@ def main():
         line_of[index] = next(i for i, ln in enumerate(lines, 1) if norm(text) and norm(text) in norm(ln))
 
     out = [
-        "# 风险管理演示系统 测试点清单（状态：草稿）",
+        "# 风险管理演示系统 测试点清单",
         "",
         "| 编号 | 验证意图 | 类型 | 分析方法 | 依据（文件:行号+原话） |",
         "|---|---|---|---|---|",

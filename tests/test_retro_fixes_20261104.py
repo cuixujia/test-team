@@ -174,7 +174,7 @@ class IdTokenTest(unittest.TestCase):
             src = os.path.join(directory, "doc.md")
             with open(src, "w", encoding="utf-8") as f:
                 f.write("# 文档\n| E-BR01 | 简历投递 | 分支 |\n")
-            result = run(os.path.join(SC, "scan_outline.py"), "--input-dir", directory, "--ids-only")
+            result = run(os.path.join(SC, "scan_outline.py"), "--input-dir", directory)
             self.assertIn("E-BR01", result.stdout)
             self.assertNotIn("\n  BR01 @", result.stdout)
 

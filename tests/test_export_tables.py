@@ -17,7 +17,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "export_tables.py")
 
-TP_MD = """# 示例测试点清单（状态：草稿）
+TP_MD = """# 示例测试点清单
 
 ## 测试点主表
 
@@ -52,7 +52,7 @@ SCOPE_MD = """# 任务功能清单
 | 交易限额管理 | 星云风险管理系统 | 风险管理 |
 """
 
-TC_MD = """# 示例测试用例清单（状态：草稿）
+TC_MD = """# 示例测试用例清单
 
 ## 测试用例主表
 

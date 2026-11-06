@@ -34,6 +34,7 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - **步骤可执行性判据**：步骤含具体入口、输入值、操作对象；不含「等一下」「适当输入」。
 - **预期可判定判据**：预期结果有具体值/文案/状态，可直接判 pass/fail。
 - **前置条件与测试数据分离**：前置是状态，数据是输入。
+- **排序规则（2026-11-06 新增，便于实际执行为唯一准）**：TC 编号顺序承接 TP 顺序为主线，同一页面/表单/操作对象的 TC **连续相邻**；禁止在不同对象间反复横跳（如 TC-001 表单A、TC-002 表单B、TC-003 回表单A 即为编排缺陷）；共用造数/登录态的用例连续放置，避免执行者重复搭环境。同一验证对象的**有序多步**（如流程类）按执行先后编号。排序缺陷是 TC 级问题，交设计专家重排（改主件），不阻塞语义判定本身。
 
 ## 标签规范
 
@@ -60,7 +61,9 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 ## 清单模板
 
 ```markdown
-# <目标功能> 测试用例清单（状态：草稿 / 质检后 / 已评审）
+# <目标功能> 测试用例清单
+
+（主件**不含状态字段**：确认/进度状态唯一权威 = `state/status.md`；主件动字样=动指纹=机验作废。2026-11-06 瘦身，同 test-point-spec）
 
 | 编号 | 标题 | 关联TP | 优先级 | 前置条件 | 测试数据 | 操作步骤 | 预期结果 | 用例类型 | 标签 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -86,11 +89,11 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 校验统一入口：`check.py --phase tc|full`（内部承接 TP/TC 清单**各自**的引文逐字、基线、TC 结构、端到端追溯）；禁止引用被收敛的 `validate_delivery.py`。
 <!-- CONTRACT-END: test-case-spec -->
 
-> 表格解析唯一实现在 `.opencode/skills/test-script-lib/scripts/mdtable.py`；`scripts/verify_test_cases.py` 从其导入。
+> 表格解析唯一实现在 `test-script-lib/scripts/mdtable.py`（各生效安装位置下该 skill 目录内：本地 `.opencode/skills/…`、服务端 `~/.config/opencode/skills/…`）；`scripts/verify_test_cases.py` 从其导入。
 
 ## 派生数据视图（test-case-table.md，只读投影）
 
-权威数据始终是本清单主件。视图由**经理**在机验 PASS 后（用户确认前）用 `export_tables.py --phase tc` 派生，**确认关口以 table 为载体、用户可见均用 table**；语义质检仍看主件，table 不单独承载语义：
+权威数据始终是本清单主件。视图由**经理**在**语义质检修复闭环、终轮全量机验 PASS 后**（用户确认关口前）用 `export_tables.py --phase tc` 派生——语义质检与修复只看主件，提前出表必随主件修复作废重导（2026-11-06 收敛，出表时机后移）；**确认关口以 table 为载体、用户可见均用 table**；语义质检仍看主件，table 不单独承载语义：
 
 - **视图文件只包含一张表**（无标题、无引语），列为以下 14 列；是主件「标签」列三键拆列+TP 意图回填的**纯映射**：
 
@@ -98,13 +101,17 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 
 - 测试点验证意图 = 主 TP（`关联TP` 首个）的验证意图，按 `--tp-file` 给出的测试点清单回填；主 TP 不存在则留空并 WARN。
 - 所属系统 / 业务活动 / 业务功能 = 主件「标签」列三键拆列，缺键按标签规范留空。
-- 依据（主TP） = 主 TP 依据的指针级串（`文件:行号`、`CL-xxx`）。
+- 依据（主TP） = 主 TP 依据的指针级串（`文件:行号`、`CL-xxx`）。**视图列不带 `L` 前缀**——指针级写法仅属于视图，主件内引用不得仿写。
+
+- **主件引用格式与机验联动（2026-11-06 复盘收敛）**：主件单元格（前置条件/测试数据/操作步骤/预期结果等）内的资料引用**一律写 `文件名:L行号「摘录」`（带 `L`）**，与 `prd-record-spec` 引用语法同口径；机验管线 `quote-tc` 步骤按该语法从主件抽取并逐字比对——**写成 `文件:行号`（不带 L）不会被抽中，quote-tc 将整体跳过，等于放弃逐字保真机验；机验管线对此有显式 WARN（2026-11-06 补口），见 WARN 即修正引用格式重跑，不得采信静默降级的结果（实测曾致质检误述 skip）**。视图列的指针级写法（无 L）由 export_tables 自动生成，不属于主件。
 - **映射时效**：主件变更即视图失效——机验 PASS 后重跑 `export_tables.py`，数据自动跟随主件刷新。
 
 ```bash
 python3 .opencode/skills/test-point-spec/scripts/export_tables.py --phase tc \
   --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
 ```
+
+> 命令前缀按当前生效安装位置取：本地 `.opencode/skills/…`，服务端 `~/.config/opencode/skills/…`。
 
 行数与编号集合同主表自洽（脚本内置断言，不一致 exit 1）。
 
@@ -121,7 +128,7 @@ python3 .opencode/skills/test-point-spec/scripts/export_tables.py --phase tc \
 ## 交付约束
 
 - 最终交付的测试用例清单中**不得出现业务功能编号**——归属信息通过标签列表达。
-- 交付前运行 `test-point-spec/scripts/check.py --phase tc`；最终交付前再运行 `--phase full`，机器报告通过且指纹未变后方可交付。TC 清单引文逐字校验已内置于管线（quote-tc 步骤，报告工件加 `.quotes-tc.json`）。
+- 交付前运行 `check.py --phase tc`（本地 `.opencode/skills/test-point-spec/scripts/check.py`，服务端 `~/.config/opencode/skills/test-point-spec/scripts/check.py`）；最终交付前再运行 `--phase full`，机器报告通过且指纹未变后方可交付。TC 清单引文逐字校验已内置于管线（quote-tc 步骤，报告工件加 `.quotes-tc.json`）；**quote-tc 生效前提是主件引用带 `L` 前缀**（见派生视图节），交稿自检时应确认机验报告含 `.quotes-tc.json` 工件且 quote-tc 非 skipped。
 
 ## 变更规则
 

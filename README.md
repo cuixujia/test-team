@@ -23,16 +23,18 @@
 
 ## 工作流
 
-1. **资料入库（fail-fast）**：`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
-2. **轻扫描、选范围**：依据 outline.md 列出候选功能与规则编号索引；用户选范围时一并确认资料角色，之后才做深度质检。
-3. **范围闭合**：补入相关全局约束和跨功能依赖；仅对本次范围及依赖质检。
-4. **资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单落盘 `output/reports/tp-input-check.md`；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
-5. **集中澄清**：QA 澄清候选与基线占位合并一次询问；结论登记 `CL-xxx`。**影响 TP 判定的澄清闭环后，TP 才生成**（仅影响 TC 数据构造的缺件项登记即可放行）。
-6. **生成测试点（阶段 5 尾）**：设计专家基于落盘基线、CL 结论与阶段 3 报告生成测试点。
-7. **机验+出表+用户确认**：`check.py --phase tp` 机验 PASS 后，经理**立即**生成测试点数据视图 `test-point-table.md`，**以 table 为载体**交语义质检与用户确认（确认即代基线联签冻结）；确认时的删改意见由经理映射回主件、修订后重导 table。
-8. **用例资料质检（阶段 8，先行）**：检查开发设计主资料可测性与缺件，报告落盘 `output/reports/tc-input-check.md`；缺件经澄清闭环或让步留痕后用例分支才启动。
-9. **生成 TC（阶段 10）**：基于确认 TP、阶段 8 结论和开发设计主资料生成；`check.py --phase full` 全量机验 PASS 后经理先出 `test-case-table.md`，再以 table 载体交语义质检与用户确认。
-10. **修复与变更**：按问题 ID 和追溯关系增量修复（修复单一次性打包，见 AgentDesign 质检收敛），最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
+阶段的规范编号以 skills 体系为准：3=资料质检、4=澄清、5=TP 生成、6=TP 质检、7=TP 确认、8=用例资料质检、10=TC 生成、11=TC 质检、12=TC 确认；资料入库与范围步骤为 1/2。下表步骤序号仅用于本列表叙述，不作为阶段号引用（历史文档中的「阶段 N 报告」等指 skills 体系编号）。
+
+1. **阶段 1：资料入库（fail-fast）**：`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
+2. **阶段 2：轻扫描、选范围**：依据 outline.md 列出候选功能与规则编号索引；用户选范围时一并确认资料角色，之后才做深度质检。
+3. **阶段 2 尾：范围闭合**（无独立阶段号，随阶段 2 收口）：补入相关全局约束和跨功能依赖；仅对本次范围及依赖质检。
+4. **阶段 3：资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单落盘 `output/reports/tp-input-check.md`；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
+5. **阶段 4：集中澄清**：QA 澄清候选与基线占位合并一次询问；结论登记 `CL-xxx`。**影响 TP 判定的澄清闭环后，TP 才生成**（仅影响 TC 数据构造的缺件项登记即可放行）。
+6. **阶段 5：生成测试点**：设计专家基于落盘基线、CL 结论与阶段 3 报告生成测试点。
+7. **阶段 6/7：机验+质检+修复闭环+出表+用户确认**：`check.py --phase tp` 机验（阶段 6）PASS 后，质检以**主件＋机验工件**做语义关；**修复闭环（一次打包单轮修完→增量机验→终轮全量机验 PASS）后**，经理才生成测试点数据视图 `test-point-table.md`，**以 table 为载体**交用户确认（阶段 7；确认即代基线联签冻结）；确认时的删改意见由经理映射回主件、修订后重导 table。
+8. **阶段 8：用例资料质检（先行）**：检查开发设计主资料可测性与缺件，报告落盘 `output/reports/tc-input-check.md`；缺件经澄清闭环或让步留痕后用例分支才启动。
+9. **阶段 10/11/12：生成 TC＋质检＋修复闭环＋确认**：基于确认 TP、阶段 8 结论和开发设计主资料生成 TC（阶段 10）；`check.py --phase full` 全量机验 PASS 后质检以主件＋机验工件做语义关（阶段 11），**修复闭环且终轮全量机验 PASS 后**经理出 `test-case-table.md`，以 table 载体交用户确认（阶段 12）。
+10. **修复与变更**（贯穿阶段，无编号）：按问题 ID 和追溯关系增量修复（修复单一次性打包，见 AgentDesign 质检收敛），最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
 
 用户正式确认只有 TP 和 TC 两处，载体均为 table 数据视图。真正需要用户决策的问题必须等待，不能猜答案。
 
@@ -50,6 +52,7 @@ output/reports/check-tp.json       # TP 机验报告（+ .quotes-tp.json：TP �
 output/reports/check-tc.json       # TC 机验报告（+ .quotes-tc.json：TC 引文逐字明细）
 output/reports/check-full.json     # 最终全量兜底结果
 output/reports/*-check.md          # 独立语义质检报告（一条问题=一句事实一处证据）
+output/reports/baseline-reconcile.md        # 阶段 3 基线对账结论（QA 独立任务，一句结论+要点清单；对账发现的问题并入修复单）
 state/process-log.md               # 过程轻量留痕：单行一条「日期|阶段|结果|异常一句话」（经理独占写）
 ```
 
@@ -68,6 +71,7 @@ python3 .opencode/skills/test-point-spec/scripts/check.py \
   --baseline <requirements-baseline.json> \
   --scope-list <scope-list.md> --tp-file <test-point.md> --tc-file <test-case.md> \
   --clarifications <clarifications.md> --report <output/reports/check-full.json>
+#  可加 --manifest <会话目录>/scope/files-manifest.md：基线 input_files 与入库清单逐条交叉校验
 
 # 引文逐字机验（可单独运行；--report 落带清单指纹的 JSON 工件）
 python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
@@ -80,9 +84,10 @@ python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py \
 # 冻结需求基线前校验结构、范围和逐条证据（input_files 指纹绑定）
 python3 .opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py \
   <requirements-baseline.json> --input-dir <资料目录> \
+  --manifest <会话目录>/scope/files-manifest.md \
   --clarifications <clarifications.md> --freeze
 
-# 数据视图：清单主件 → 纯数据表（机验 PASS 后由经理生成；行数/编号与主表自洽，仅作查看）
+# 数据视图：清单主件 → 纯数据表（语义质检修复闭环、终轮全量机验 PASS 后由经理生成；行数/编号与主表自洽，仅作查看）
 python3 .opencode/skills/test-point-spec/scripts/export_tables.py \
   --phase tp --tp-file <test-point.md> --baseline <requirements-baseline.json> \
   --scope-list <scope-list.md> --output <test-point-table.md>

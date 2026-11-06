@@ -9,6 +9,7 @@ ng(){ FAIL=$((FAIL+1)); printf '[FAIL] %s\n' "$1"; }
 W="workspace/runtime_demo/file"
 S="$W/sess-demo-0001"
 PRD="$W/project-docs"
+CHECK=".opencode/skills/test-point-spec/scripts/check.py"
 VQ=".opencode/skills/prd-record-spec/scripts/verify_quotes.py"
 VB=".opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py"
 VP=".opencode/skills/test-point-spec/scripts/verify_test_points.py"
@@ -23,9 +24,9 @@ for a in test-manager test-designer test-qa-expert; do
   f=".opencode/agents/$a.md"
   [ -f "$f" ] && ok "$a.md 存在" || { ng "$a.md 缺失"; continue; }
   grep -q '^mode: ' "$f" && ok "$a.md 有 mode" || ng "$a.md 缺 mode"
-  grep -q 'action: edit' "$f" && ok "$a.md 有 edit 权限" || ng "$a.md 缺 edit 权限"
-  grep -q 'action: subagent' "$f" && ok "$a.md 有 subagent 权限" || ng "$a.md 缺 subagent 权限"
-  grep -q 'action: question' "$f" && ok "$a.md 有 question 权限" || ng "$a.md 缺 question 权限"
+  grep -q '^permission:' "$f" && grep -q '^  edit:' "$f" && ok "$a.md 有 edit 权限" || ng "$a.md 缺 edit 权限"
+  grep -q '^  task:' "$f" && ok "$a.md 有 subagent 权限（V1 键名 task）" || ng "$a.md 缺 subagent 权限（V1 键名 task）"
+  grep -q '^  question:' "$f" && ok "$a.md 有 question 权限" || ng "$a.md 缺 question 权限"
 done
 
 echo
@@ -33,9 +34,9 @@ echo "========== 2. 角色隔离 =========="
 grep -q 'mode: subagent' .opencode/agents/test-designer.md && ok "designer 为 subagent" || ng "designer 模式错"
 grep -q 'mode: subagent' .opencode/agents/test-qa-expert.md && ok "qa 为 subagent" || ng "qa 模式错"
 grep -q 'mode: primary' .opencode/agents/test-manager.md && ok "manager 为 primary" || ng "manager 模式错"
-grep -A2 'action: question' .opencode/agents/test-designer.md | grep -q 'deny' && ok "designer 禁止 question" || ng "designer question 未禁用"
-grep -A2 'action: question' .opencode/agents/test-qa-expert.md | grep -q 'deny' && ok "qa 禁止 question" || ng "qa question 未禁用"
-grep -A2 'action: subagent' .opencode/agents/test-designer.md | grep -q 'deny' && ok "designer 禁止 subagent" || ng "designer subagent 未禁用"
+grep -q '^  question: deny' .opencode/agents/test-designer.md && ok "designer 禁止 question" || ng "designer question 未禁用"
+grep -q '^  question: deny' .opencode/agents/test-qa-expert.md && ok "qa 禁止 question" || ng "qa question 未禁用"
+grep -q '^  task: deny' .opencode/agents/test-designer.md && ok "designer 禁止 subagent" || ng "designer subagent 未禁用"
 # 单一写入者：只看 permissions 块（frontmatter），不看正文
 perm_block(){ sed -n '1,/^---$/p' "$1" | sed -n '2,/^---$/p'; }
 perm_block .opencode/agents/test-designer.md | grep -q 'output/reports' && ng "designer 被授予报告写权限" || ok "designer 无报告写权限"
@@ -58,7 +59,7 @@ grep -rq 'source_catalog_sha256\|--ledger\|--anchors' .opencode/skills/*/scripts
 
 echo
 echo "========== 4. 校验脚本正面回归（应全部通过）=========="
-python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir "$PRD" --ids-only >/dev/null 2>&1 && ok "scan_outline 轻扫描通过" || ng "scan_outline 失败"
+python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir "$PRD" >/dev/null 2>&1 && ok "scan_outline 轻扫描通过" || ng "scan_outline 失败"
 python3 "$VQ" "$TP" --input-dir "$PRD" --extract-from >/dev/null 2>&1 && ok "verify_quotes 直接抽 TP 引用通过" || ng "verify_quotes TP 引用失败"
 python3 "$VB" "$BASE" --input-dir "$PRD" --clarifications "$S/state/clarifications.md" --freeze >/dev/null 2>&1 && ok "verify_requirement_baseline（直引+指纹+冻结）通过" || ng "verify_requirement_baseline 失败"
 python3 "$VP" "$TP" --input-dir "$PRD" --scope-list "$S/state/scope-list.md" --clarifications "$S/state/clarifications.md" >/dev/null 2>&1 && ok "verify_test_points 通过" || ng "verify_test_points 失败"
@@ -256,11 +257,11 @@ req=next(r for r in b['requirements'] if r['id']=='REQ-001')
 req['evidence'][0]['quote']='风险等级分为高中低三档。'
 json.dump(b,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
 PY
-OUT=$(python3 "$VB" "$BASE" --input-dir "$PRD" --freeze 2>&1)
+OUT=$(python3 "$CHECK" --phase tp --input-dir "$PRD" --baseline "$BASE" --tp-file "$TP" --report /tmp/_check-fail.json 2>&1)
 echo "$OUT" | grep -q '^\[FAIL\]' && ok "机验失败输出含 [FAIL] 步骤行" || ng "机验失败输出缺 [FAIL] 步骤行"
 echo "$OUT" | grep -q '^\[REPORT\]' && ok "机验失败输出含 [REPORT] 工件行" || ng "机验失败输出缺 [REPORT] 工件行"
-echo "$OUT" | grep -q '校验汇总: FAIL$' && ok "机验失败输出含「校验汇总: FAIL」锚点" || ng "机验失败输出缺汇总锚点"
-grep -Eq '"label"' "$(echo "$OUT" | sed -n 's/^\[REPORT\] //p' | head -1)" && ok "机验报告工件结构化承载失败明细（steps.label）" || ng "报告工件缺结构化失败明细"
+echo "$OUT" | grep -q '校验汇总: FAIL' && ok "机验失败输出含「校验汇总: FAIL」锚点" || ng "机验失败输出缺汇总锚点"
+grep -Eq '"label"' "$(echo "$OUT" | sed -n 's/^\[REPORT\] //p' | tail -1)" && ok "机验报告工件结构化承载失败明细（steps.label）" || ng "报告工件缺结构化失败明细"
 cp /tmp/_base.bak "$BASE"
 else
 ng "5.17 跳过：fixture 缺失（/tmp/_base.bak 不存在）"

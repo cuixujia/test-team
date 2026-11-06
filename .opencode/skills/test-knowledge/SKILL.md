@@ -9,7 +9,7 @@ description: 测试团队唯一权威知识库——四份原文（方法论/维
 
 ## 一、知识清单
 
-路径均相对本 skill 目录（`SKILL.md` 所在目录）。前四份为**原文只读件**，一字不改：
+路径锚点：附属知识件以 skill 自身目录为准——本地开发环境为 `.opencode/skills/test-knowledge/references/`；服务端全局安装为 `~/.config/opencode/skills/test-knowledge/references/`，二者同构。前四份为**原文只读件**，一字不改：
 
 | 文件 | 解决什么问题 | 关键章节 |
 |---|---|---|

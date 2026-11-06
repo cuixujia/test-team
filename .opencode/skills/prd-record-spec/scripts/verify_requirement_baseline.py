@@ -41,6 +41,34 @@ def load_json(path):
 # norm 已由 test-script-lib/mdtable.py 提供（norm_quote：空白单格化+标点折叠+转义还原——与 verify_quotes 同口径）
 
 
+MANIFEST_ROW_RE = re.compile(r"^\|\s*(.+?)\s*\|\s*([0-9a-fA-F]{64})\s*\|\s*$")
+
+
+def parse_manifest_md(path):
+    """解析 files-manifest.md（scan_outline.py 落盘的 sha256 表格）→ {file: sha256}。
+
+    无法读取/无表头时返回 None，由调用方报错；空表返回 {}（合法：尚未登记任何文件）。"""
+    if not path or not os.path.isfile(path):
+        return None
+    entries = {}
+    with open(path, encoding="utf-8-sig") as stream:
+        rows = [line.strip() for line in stream.read().splitlines()]
+    try:
+        head = rows.index("| 文件 | sha256 |")
+    except ValueError:
+        return None
+    body = rows[head + 2:]  # 跳过表头与分隔行
+    for line in body:
+        m = MANIFEST_ROW_RE.match(line)
+        if not m:
+            continue
+        name = m.group(1)
+        if name in entries:
+            return None  # 同名登记冲突：无法判定权威指纹，整体不可解析
+        entries[name] = m.group(2)
+    return entries
+
+
 def clarification_rows(path):
     if not path or not os.path.isfile(path):
         return {}
@@ -60,6 +88,7 @@ def main():
     parser.add_argument("baseline", help="requirements-baseline.json")
     parser.add_argument("--input-dir", required=True, help="资料目录：证据 file+lines+quote 对原文件逐字比对")
     parser.add_argument("--clarifications", default="", help="澄清记录；引用 CL 证据时必填")
+    parser.add_argument("--manifest", default="", help="files-manifest.md 路径；提供时校验基线 input_files 与入库指纹一致")
     parser.add_argument("--freeze", action="store_true", help="冻结前校验：不允许待澄清需求")
     args = parser.parse_args()
     baseline = load_json(args.baseline)
@@ -95,6 +124,25 @@ def main():
             errors.append(
                 f"指纹不一致（资料已变更）: {rel}（基线登记 {str(item.get('sha256', ''))[:12]} / 实际 {digest_actual[:12]}）"
             )
+
+    # 入库指纹交叉校验（--manifest 提供时）：基线 input_files 必须逐条命中入库清单
+    # （同名同 sha256），否则判定为登记/复制失误，而非资料变更。清单多余条目属正常
+    # （资料未被基线引用），不报错。
+    if args.manifest:
+        manifest_entries = parse_manifest_md(args.manifest)
+        if manifest_entries is None:
+            errors.append(f"入库指纹清单不可解析: {args.manifest}")
+        else:
+            for item in manifest:
+                rel = str(item.get("file", ""))
+                digest_base = str(item.get("sha256", "")).lower()
+                hit = manifest_entries.get(rel)
+                if hit is None:
+                    errors.append(f"{rel}: 未在入库指纹清单登记（未入库文件不得写入基线）")
+                elif hit.lower() != digest_base:
+                    errors.append(
+                        f"{rel}: 基线指纹与入库清单不一致（基线 {digest_base[:12]} / 清单 {hit[:12]}）"
+                    )
 
     def v2_quote_ok(rel, lines_spec, quote):
         try:

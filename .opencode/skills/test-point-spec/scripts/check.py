@@ -33,7 +33,7 @@ import time
 from datetime import datetime, timezone
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
-SCRIPT_DAT = os.path.join(ROOT, ".opencode", "skills")
+SCRIPT_DAT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))  # scripts → test-point-spec → skills，树内引用以 __file__ 为锚，不依赖仓库目录名
 
 
 def digest(path):
@@ -149,6 +149,7 @@ def main():
     parser.add_argument("--tp-file", required=True)
     parser.add_argument("--tc-file", default="")
     parser.add_argument("--clarifications", default="")
+    parser.add_argument("--manifest", default="", help="files-manifest.md 路径；提供时基线 input_files 与入库指纹交叉校验")
     parser.add_argument("--only", default="", help="增量机验：只跑指定步骤（逗号分隔，如 --only quote-tp,requirement-to-test-point）；缺省全量")
     parser.add_argument("--report", required=True, help="机验 JSON 输出路径（约定 check-<phase>.json）")
     args = parser.parse_args()
@@ -187,6 +188,23 @@ def main():
     # 引文人肉面收口到 verify_quotes；缺省从 TP/TC 清单自体抽引用（直引证据的单一来源是清单本身）。
     import re as _re
     CITE_SCAN = _re.compile(r"([A-Za-z0-9_\-./\u4e00-\u9fff]+?\.(?:md|markdown|txt|csv)):L\d")
+    # 无 L 前缀探测（2026-11-06 收敛）：跳过=静默放弃逐字保真，实测已双次翻车（早期 check-tc 裸奔、
+    # QA 语义报告误述 skip）；主件引用契约 = `文件:L行号「摘录」`，形如 `文件:数字` 视为漏写 L。
+    NO_L_SCAN = _re.compile(r"([A-Za-z0-9_\-./\u4e00-\u9fff]+?\.(?:md|markdown|txt|csv)):\s?\d")
+
+    def _no_l_warn(src_path, kind):
+        text = _text_of(src_path)
+        hits = [m.group(0) for m in NO_L_SCAN.finditer(text) if not CITE_SCAN.search(m.group(0))]
+        if hits:
+            note = (
+                f"[WARN] {src_path} 发现 {len(hits)} 处疑似未带 L 前缀的引用（如 {hits[0]}），"
+                f"quote-{kind} 未抽中=放弃逐字保真；主件引用须写 `文件:L行号「摘录」`，请修正后重跑机验"
+            )
+            print(note)
+            return {"label": f"quote-{kind}(warn: 未带L前缀引用×{len(hits)}，未抽中)", "command": [],
+                    "exit_code": 0, "stdout": note, "stderr": "", "duration_seconds": 0.0,
+                    "artifacts": {}, "scripts": {}}
+        return None
 
     def _text_of(path):
         try:
@@ -204,7 +222,11 @@ def main():
         else:
             steps.append(skipped("quote-tp", "--only 增量机验未选中"))
     else:
-        steps.append({"label": "quote-tp(skipped: 清单无直引引用，引文校验由基线机验覆盖)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
+        warn_step = _no_l_warn(tp_quote_src, "tp")
+        if warn_step:
+            steps.append(warn_step)
+        else:
+            steps.append({"label": "quote-tp(skipped: 清单无直引引用，引文校验由基线机验覆盖)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
 
     # 2) TC 清单引文（2026-11-05 新增：字面保真必须有机验裁决）
     if args.phase in ("tc", "full"):
@@ -218,13 +240,20 @@ def main():
                 else:
                     steps.append(skipped("quote-tc", "--only 增量机验未选中"))
             else:
-                steps.append({"label": "quote-tc(skipped: TC 清单无直引引用)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
+                warn_step = _no_l_warn(args.tc_file, "tc")
+                if warn_step:
+                    steps.append(warn_step)
+                else:
+                    steps.append({"label": "quote-tc(skipped: TC 清单无直引引用)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
 
     if want("requirements-baseline"):
         baseline_command = [sys.executable, tools["baseline"], args.baseline, "--input-dir", args.input_dir, "--freeze"]
         if args.clarifications:
             baseline_command += ["--clarifications", args.clarifications]
-        steps.append(run("requirements-baseline", baseline_command, [args.baseline]))
+        if args.manifest:
+            # 入库指纹交叉校验：基线 input_files 必须逐条命中入库清单（同名同 sha256）
+            baseline_command += ["--manifest", args.manifest]
+        steps.append(run("requirements-baseline", baseline_command, [args.baseline, args.manifest, args.clarifications]))
     else:
         steps.append(skipped("requirements-baseline", "--only 增量机验未选中"))
 

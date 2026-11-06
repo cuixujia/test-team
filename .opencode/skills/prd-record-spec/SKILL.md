@@ -15,7 +15,9 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；产物同步在 `state/status.md` 登记资料指纹段落，引用 files-manifest）：
 
    ```bash
-   python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
+   python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/scan_outline.py \
+   # 本地：python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
+   # 服务端：python3 ~/.config/opencode/skills/prd-record-spec/scripts/scan_outline.py \
      --input-dir <资料目录> --output <会话目录>/scope/outline.md \
      --manifest <会话目录>/scope/files-manifest.md
    ```
@@ -65,9 +67,11 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 ## 四、机验（零语义，脚本执行）
 
 ```bash
-python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
+python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quotes.py \
   <引用表.md 或 .json> --input-dir <资料目录> --context --report <引文报告.json>
 ```
+
+> 命令前缀按当前生效安装位置取：本地 `.opencode/skills/…`，服务端 `~/.config/opencode/skills/…`（本节所有命令同此规则）。
 
 - 引用表可为 Markdown 管道表（表头契约：首列=`来源文件`、次列=`行号`）或 JSON 数组；
 - 加 `--extract-from` 直接按引用语法从清单抽引用，免维护引用表；
@@ -98,7 +102,7 @@ python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
 |---|---|
 | `schema_version` | 顶层必填，值 = `1` |
 | `selected_scope` | 顶层必填非空数组；元素含 `feature_id`+`name`；**每条 requirement 的 `feature_id` 必须在 selected_scope 白名单内** |
-| `input_files` | 逐文件 `file`+`sha256`（Python 口径，直接复制 files-manifest；不匹配即 FAIL） |
+| `input_files` | 逐文件 `file`+`sha256`（Python 口径，直接复制 files-manifest；不匹配即 FAIL）；机验提供 `--manifest` 时**逐条交叉校验**：每个基线登记文件必须命中入库清单且指纹一致，未入库文件不得写入基线（清单多余条目=未被基线引用的资料，属正常不报错） |
 | `requirements[].id` | `REQ-\d{3}`，任务内唯一 |
 | `risk` | 四值档位 `P0/P1/P2/P3`；映射口径：PRD「高」→P1、「中」→P2、「低」→P3（P0 预留给全景性缺陷，默认不用） |
 | `status` | 三态 `confirmed` / `needs_clarification` / `out_of_scope` |
@@ -127,6 +131,8 @@ python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
 | **归属登记表** | 列名固定：`功能/依赖名称｜所属系统｜所属业务活动`，按**功能名称原文**登记（名称须与 PRD 业务功能分组父标题逐字一致） | `export_tables.py` 视图归属列 |
 
 三张表的结构被上表消费方解析；任何其他表不参与机器解析（留痕用）。
+
+**章节定位契约（2026-11-06 复盘收敛）**：三张表（功能清单/资料角色登记/归属登记）**必须各自置于一个 `##` 章节标题之下**，且功能清单为**第一个 `##` 章节下的第一张表**——解析器（`mdtable.parse_first_table` 等）按章节边界取表，首表若裸置于章节标题之外会与后续表合并解析，造成列位错乱与假泄漏误报（fixture 口径：`tests/test_check_pipeline.py` 的「## 一、功能清单 / ## 二、资料角色登记 / ## 三、归属登记」）。
 
 ## 七、任务期封版
 

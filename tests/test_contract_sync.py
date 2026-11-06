@@ -122,6 +122,47 @@ class TestContractSync(unittest.TestCase):
         self.assertIn("资料角色登记", read(os.path.join(SKILLS, "prd-record-spec", "SKILL.md")))
         self.assertIn("scope_list_prd_files", self.tc_script)
 
+    # —— scope-list 章节定位契约（2026-11-06 复盘收敛：首表必须 ## 章节包裹，防两表合并假泄漏）——
+    def test_scope_list_section_contract_declared(self):
+        prd = read(os.path.join(SKILLS, "prd-record-spec", "SKILL.md"))
+        self.assertIn("章节定位契约", prd, "prd-record-spec §六 缺 scope-list 章节定位契约")
+        self.assertIn("## 章节标题之下".replace("## 章节标题之下", "章节标题之下"), prd)
+
+    def test_scope_list_section_behavior(self):
+        """行为级：首表裸置（无 ## 标题）时 parse_first_table 会合并后续表 →
+        此为已定案缺陷口径，回归锁定 fixture 结构必须章节化。"""
+        import sys
+        sys.path.insert(0, os.path.join(SKILLS, "test-script-lib", "scripts"))
+        from mdtable import parse_first_table  # noqa: E402
+        good = "# 清单\n\n## 一、功能清单\n\n| 业务功能编号 | 业务功能名称 |\n|---|---|\n| F01 | 需求创建 |\n\n## 二、资料角色登记\n\n| 文件 | 角色 |\n|---|---|\n| prd.md | PRD 主 |\n"
+        header, rows = parse_first_table(good)
+        self.assertEqual(header, ["业务功能编号", "业务功能名称"])
+        codes = {r[0] for r in rows}
+        self.assertEqual(codes, {"F01"}, "章节化后 parse_first_table 不应混入后续表")
+
+    # —— TC 主件引用带 L 契约（2026-11-06 复盘收敛：quote-tc 生效前提）——
+    def test_tc_inline_citation_contract_declared(self):
+        block = self.tc_skill_text
+        self.assertIn("主件引用格式与机验联动", block, "test-case-spec 缺 TC 主件引用格式契约")
+        self.assertIn("带 `L`", block, "test-case-spec 契约应写明主件引用带 L")
+        # check.py 的 CITE_SCAN 与 verify_quotes 的 CITE_RE 均要求 :L —— 声明与实现联动
+        check_src = read(os.path.join(SKILLS, "test-point-spec", "scripts", "check.py"))
+        self.assertRegex(check_src, r"CITE_SCAN[^\n]*:L\\d", "check.py CITE_SCAN 未按 :L 触发 quote-tc")
+        quotes_src = read(os.path.join(SKILLS, "prd-record-spec", "scripts", "verify_quotes.py"))
+        self.assertTrue(":L(\\d+" in quotes_src or "".join([":L(", "\\d+"]) in quotes_src, "verify_quotes CITE_RE 未按 :L 抽取")
+
+    # —— 派发单结构契约要点（2026-11-06 复盘收敛）——
+    def test_dispatch_template_struct_contract_declared(self):
+        mgr = read(os.path.join(ROOT, ".opencode", "agents", "test-manager.md"))
+        self.assertIn("【结构契约要点", mgr, "派发单模板缺结构契约要点段")
+        self.assertIn("第一个 `##` 章节之前的唯一表格", mgr)
+        self.assertIn("基线对账归属", mgr, "test-manager 缺基线对账归属条款")
+
+    # —— TP 行序与编号优先级（2026-11-06 复盘收敛）——
+    def test_tp_number_monotonic_vs_row_order_declared(self):
+        block = self.tp_skill_text.split("CONTRACT-BEGIN: test-point-spec", 1)[1]
+        self.assertIn("行序与编号优先级", block, "TP 契约块缺行序/编号优先级条款")
+
 
 if __name__ == "__main__":
     unittest.main()

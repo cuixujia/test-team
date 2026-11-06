@@ -2,57 +2,32 @@
 description: 测试设计专家——生成者。负责整理需求基线（纯文本直引）、生成测试点（阶段 5）、生成测试用例（阶段 10）、按质检报告修复产物。不做质检、不与用户对话
 mode: subagent
 color: "#16a34a"
-permissions:
-  # ⚠️ 顺序敏感：必须「先 deny 兜底 → 再逐项 allow 例外」，写反则隔离失效。
-  - action: edit
-    resource: "*"
-    effect: deny
+# ⚠️ 权限为 OpenCode V1（1.x）映射式：同一工具键内按书写顺序评估、最后一条匹配生效。
+#    必须「先 deny 兜底 → 再逐项 allow 例外」，写反则权限隔离失效。
+# 键名以 V1 为准（shell→bash、subagent→task）；本形态对 V2 兼容（V1 定义维持可解析）。
+permission:
   # 结构化需求基线
-  - action: edit
-    resource: "workspace/runtime_*/file/*/scope/requirements-baseline.json"
-    effect: allow
-  # 测试点清单
-  - action: edit
-    resource: "workspace/runtime_*/file/*/output/tp/test-point.md"
-    effect: allow
-  # 测试用例清单
-  - action: edit
-    resource: "workspace/runtime_*/file/*/output/tc/test-case.md"
-    effect: allow
-  # shell：仅开放校验脚本
-  - action: shell
-    resource: "*"
-    effect: deny
-  - action: shell
-    resource: "python3 .opencode/skills/*/scripts/*.py *"
-    effect: allow
+  edit:
+    "*": deny
+    "workspace/runtime_*/file/*/scope/requirements-baseline.json": allow
+    "workspace/runtime_*/file/*/output/tp/test-point.md": allow
+    "workspace/runtime_*/file/*/output/tc/test-case.md": allow
+  # bash：禁止 —— 脚本执行纪律（校验一律经理收回时执行；你交稿只附「待补跑命令清单」，不自行运行）
+  # 2026-11-06 收口：原 allow 与纪律相悖，deny 与规则对齐。
+  bash:
+    "*": deny
   # skill 按角色授权
-  - action: skill
-    resource: "*"
-    effect: deny
-  - action: skill
-    resource: "prd-record-spec"
-    effect: allow
-  - action: skill
-    resource: "test-point-spec"
-    effect: allow
-  - action: skill
-    resource: "test-case-spec"
-    effect: allow
-  - action: skill
-    resource: "test-analysis-methods"
-    effect: allow
-  - action: skill
-    resource: "test-knowledge"
-    effect: allow
+  skill:
+    "*": deny
+    "prd-record-spec": allow
+    "test-point-spec": allow
+    "test-case-spec": allow
+    "test-analysis-methods": allow
+    "test-knowledge": allow
   # 禁止再生子 agent
-  - action: subagent
-    resource: "*"
-    effect: deny
-  # 禁止与用户对话
-  - action: question
-    resource: "*"
-    effect: deny
+  task: deny
+  # 禁止与用户对话（V1 question 仅支持简写）
+  question: deny
 ---
 
 # 测试设计专家（test-designer）
@@ -91,6 +66,7 @@ permissions:
 **机验管线**（以下命令由**经理收回时执行**；专家交稿时原样附入「待补跑命令清单」，不自行运行）：TP 阶段一条命令产出全部机验报告（引文、基线、结构、追溯、覆盖对照表自动推导），报告工件 `check-tp.json` + `.quotes-tp.json` + `.derived-coverage.md`；机器结果写入后质检专家只核对报告工件与指纹，不重跑确定性校验。**增量口径（2026-11-05 收敛 A2/C3）**：质检修复轮经理经 `check.py --only <受影响步骤>` 只验受影响步骤；**用户确认关口前的最后一次机验必须 `--phase` 全量**（终轮兜底，防止增量漏验）：
 
 ```bash
+# 路径按当前生效安装位置：本地 .opencode/...，服务端 ~/.config/opencode/...
 python3 .opencode/skills/test-point-spec/scripts/check.py --phase tp \
   --input-dir <资料目录> --baseline <需求基线.json> \
   --scope-list <任务功能清单> --tp-file <测试点清单> \
@@ -104,6 +80,7 @@ python3 .opencode/skills/test-point-spec/scripts/check.py --phase tp \
 产物必须有 TP→TC 覆盖表。机器流水线（命令由**经理收回时执行**，专家附入「待补跑命令清单」）生成绑定文件指纹的 `check-tc.json`（**含 TC 清单引文逐字机验（quote-tc 步骤）与全链追溯**）：
 
 ```bash
+# 路径按当前生效安装位置：本地 .opencode/...，服务端 ~/.config/opencode/...
 python3 .opencode/skills/test-point-spec/scripts/check.py --phase tc \
   --input-dir <资料目录> --baseline <需求基线.json> \
   --scope-list <任务功能清单> --tp-file <已确认测试点> --tc-file <测试用例清单> \

@@ -11,7 +11,7 @@
 
 用法（仓库根目录起，相对路径单命令）：
   python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir <资料目录>
-  可加 --output <路径> 落盘；--ids-only 仅输出规则编号索引（最小量输出）。
+  可加 --output <路径> 落盘。
 
 退出码：0 = 扫描成功；1 = 扫描部分失败（无法解析的文件）；2 = 用法错误
 """
@@ -69,13 +69,12 @@ def scan_file(path, rel):
     return {"rel": rel, "lines_total": len(lines), "headings": headings, "id_map": id_map, "sha256": digest}
 
 
-def render(sources, ids_only):
+def render(sources):
     out = []
     for s in sources:
         out.append(f"# {s['rel']}（{s['lines_total']} 行）")
-        if not ids_only:
-            for no, depth, title in s["headings"]:
-                out.append(f"  {no}: {'  ' * (depth - 1)}{title}")
+        for no, depth, title in s["headings"]:
+            out.append(f"  {no}: {'  ' * (depth - 1)}{title}")
         out.append("## 规则编号索引")
         for token in sorted(s["id_map"]):
             out.append(f"  {token} @ L{s['id_map'][token]}")
@@ -97,7 +96,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", required=True, help="资料目录")
     parser.add_argument("--output", default="", help="结果落盘路径（默认 stdout）")
-    parser.add_argument("--ids-only", action="store_true", help="仅输出规则编号索引")
     parser.add_argument("--manifest", default="", help="指纹清单落盘路径（python 侧 sha256；与机验同口径）")
     args = parser.parse_args()
 
@@ -119,7 +117,7 @@ def main():
                 errors.append(f"[WARN] 无法解析 {rel}: {exc}")
 
     sources.sort(key=lambda s: s["rel"])
-    text = render(sources, args.ids_only)
+    text = render(sources)
     if args.output:
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
         with open(args.output, "w", encoding="utf-8") as stream:
@@ -131,7 +129,11 @@ def main():
     print(text)
     for err in errors:
         print(err, file=sys.stderr)
-    print(f"[SCAN] 文件数: {len(sources)}  规则编号数: {sum(len(s['id_map']) for s in sources)}")
+    total_ids = sum(len(s["id_map"]) for s in sources)
+    print(f"[SCAN] 文件数: {len(sources)}  规则编号数: {total_ids}")
+    if total_ids == 0:
+        # 静默失败防线：编号抓取格式有限（BR/REQ/F01 等），抓不到≠资料没有编号。
+        print("[WARN] 规则编号索引为 0 条——可能资料使用本工具不认识的编号前缀，请人工确认后补充索引，勿直接判定资料无编号")
     if args.manifest:
         print(f"[MANIFEST] {args.manifest}")
     return 1 if errors else 0
