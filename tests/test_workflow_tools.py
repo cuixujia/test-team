@@ -129,6 +129,17 @@ class WorkflowToolsTest(unittest.TestCase):
             result = run(os.path.join(SC, "verify_quotes.py"), quotes, "--input-dir", directory)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_verify_quotes_rejects_object_json_loudly(self):
+        """对象 JSON（如基线整文件）不得静默落为 0 条假 PASS，须显式报错并指引正确工具。"""
+        with tempfile.TemporaryDirectory() as directory:
+            make_source(directory)
+            baseline = os.path.join(directory, "baseline.json")
+            dump_json(baseline, make_baseline(directory, "prd.md"))
+            result = run(os.path.join(SC, "verify_quotes.py"), baseline, "--input-dir", directory)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("JSON", result.stdout + result.stderr)
+            self.assertIn("verify_requirement_baseline", result.stdout + result.stderr)
+
     # ---- 测试点机械校验（直引/CL 依据）----
 
     def test_test_point_accepts_multiple_direct_quotes(self):

@@ -172,6 +172,15 @@ def load_quotes(path, extract_from=False):
     stripped = text.lstrip()
     if stripped.startswith("["):
         return parse_json_quotes(text)
+    if stripped.startswith("{"):
+        # 2026-11-08 fail-loud 补丁：对象 JSON（如需求基线整文件）此前会静默落到
+        # parse_md_quotes 返回空列表 → 0 条假 PASS。显式报错并指引正确工具，
+        # 杜绝"机验绿但什么都没验"。
+        raise ValueError(
+            "输入是 JSON 对象而非引用表：对需求基线请改用 verify_requirement_baseline.py "
+            "（其 evidence 逐字裁决内嵌）；如确需对引用条目机验，请抽取为 JSON 数组 "
+            '[{"file","lines","quote"}, …] 或引用语法的 Markdown 文件后再传入'
+        )
     return parse_md_quotes(text)
 
 
@@ -190,6 +199,41 @@ def lookup(path, files_cache):
     if path not in files_cache:
         files_cache[path] = read_file(path)
     return files_cache[path]
+
+
+def index_input_files(input_dir):
+    """资料目录下的实际文件清单（相对路径，posix 分隔）——文件名消歧的候选集。"""
+    files = []
+    for root, _dirs, names in os.walk(input_dir):
+        for name in names:
+            rel = os.path.relpath(os.path.join(root, name), input_dir)
+            files.append(rel.replace(os.sep, "/"))
+    return files
+
+
+def resolve_file(token, input_dir, index):
+    """把引用里的文件 token 解析为资料目录下的真实文件。
+
+    散文前缀与文件名黏连（如「对应需求平台前端设计文档.md」）会让 token 带上前缀汉字，
+    此处按「token 以某个真实文件名为后缀」消歧：取最长命中名，唯一命中才放行；
+    同名多份（不同目录）视为歧义交人裁决，无命中视为资料文件不存在。
+    返回 (真实相对路径 | None, 说明)。
+    """
+    if os.path.isfile(os.path.join(input_dir, token)):
+        return token, ""
+    token_base = token.replace("\\", "/").rsplit("/", 1)[-1]
+    by_base = {}
+    for rel in index:
+        base = rel.rsplit("/", 1)[-1]
+        if base and token_base.endswith(base):
+            by_base.setdefault(base, []).append(rel)
+    if not by_base:
+        return None, f"资料文件不存在: {token}"
+    longest = max(len(base) for base in by_base)
+    candidates = [rel for base, rels in by_base.items() if len(base) == longest for rel in rels]
+    if len(candidates) > 1:
+        return None, f"文件名消歧不唯一: {token} → {' / '.join(sorted(candidates))}"
+    return candidates[0], "散文前缀黏连，已按资料目录实际文件解析"
 
 
 def main():
@@ -214,15 +258,21 @@ def main():
     except OSError:
         pass
 
-    quotes = load_quotes(args.quotes, args.extract_from)
+    try:
+        quotes = load_quotes(args.quotes, args.extract_from)
+    except ValueError as exc:
+        print(f"[FAIL] 引用表格式错误: {exc}", file=sys.stderr)
+        return 2
     if not quotes:
         print("引用表为空：无条目可验", file=sys.stderr)
         return 2
 
     cache = {}
+    index = index_input_files(args.input_dir)
     passed = failed = auto_fixed = 0
     _report_failures = []
     _auto_fixes = []
+    _resolved = []
 
     def try_writeback(path, old, new):
         """把回填后的摘录原位写回产物（仅当：旧摘录在文件中唯一且产物不在资料目录下）。"""
@@ -246,7 +296,16 @@ def main():
         return note
 
     for q in quotes:
-        rel = q["file"]
+        rel_raw = q["file"]
+        rel, resolve_note = resolve_file(rel_raw, args.input_dir, index)
+        if rel is None:
+            print(f"FAIL 引用#{q['seq']} {rel_raw}:{q['lines']} — {resolve_note}")
+            _report_failures.append({"seq": q["seq"], "file": rel_raw, "lines": q["lines"], "quote": q["quote"], "error": resolve_note})
+            failed += 1
+            continue
+        if resolve_note:
+            print(f"[RESOLVED] 引用#{q['seq']} {rel_raw} → {rel}（{resolve_note}）")
+            _resolved.append({"seq": q["seq"], "raw": rel_raw, "resolved": rel})
         try:
             line_no = int(re.sub(r"\D", "", q["lines"][:8]) or 0)
         except ValueError:
@@ -289,7 +348,7 @@ def main():
                     })
                     print(f"[AUTOFIX] 引用#{q['seq']} {rel}:{q['lines']} 摘录按行号自愈回填（回写: {note}）")
                     ok = True
-        except (RuntimeError, ValueError) as exc:
+        except (RuntimeError, ValueError, OSError) as exc:
             print(f"FAIL 引用#{q['seq']} {rel}:{q['lines']} — {exc}")
             _report_failures.append({"seq": q["seq"], "file": rel, "lines": q["lines"], "quote": q["quote"], "error": str(exc)})
             failed += 1
@@ -323,6 +382,7 @@ def main():
             "failed": failed,
             "auto_fixed": auto_fixed,
             "auto_fixes": _auto_fixes,
+            "resolved_files": _resolved,
             "failures": _report_failures,
         }
         os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)

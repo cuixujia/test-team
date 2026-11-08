@@ -69,7 +69,21 @@ def norm_ws_single(text):
 
 
 def _cells(line):
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    """单元格切分：只按**未转义**的 `|` 切分，转义的 `\\|` 保留在单元格内。
+
+    2026-11-08 修复：原实现按裸 `|` 切分，使引文内含转义管道时（如引用 PRD 表格行）
+    证据串在「」闭合前被截断，产出伪 FAIL（test-points 步）。规范（prd-record-spec §三）
+    明确「Markdown `|` 转义由机验 norm_quote 归一，不是错误」，故切分层必须与归一层口径一致：
+    切分只认未转义的 `|`，转义一律保留在单元格内交 norm_quote 还原。
+    边界：行尾一个 `|` 恒为定界符、无条件剥离（库契约=去定界符后切分、无幽灵空列）；
+    "单元格内容以 `\|` 结尾又紧跟定界符"属畸形行，取内容完整性（保留转义），不补幽灵空列。
+    """
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]  # 规范表格行以真实管道收尾；行内 `\|` 转义一律保留，交归一层还原
+    return [c.strip() for c in re.split(r"(?<!\\)\|", s)]
 
 
 def _is_separator(cells):

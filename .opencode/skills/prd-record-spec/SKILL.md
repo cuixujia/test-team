@@ -95,7 +95,7 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 |---|---|
 | `schema_version` | 顶层必填，值 = `1` |
 | `selected_scope` | 顶层必填非空数组；元素含 `feature_id`+`name`；**每条 requirement 的 `feature_id` 必须在 selected_scope 白名单内** |
-| `input_files` | 逐文件 `file`+`sha256`（Python 口径，直接复制 files-manifest；不匹配即 FAIL）；机验提供 `--manifest` 时**逐条交叉校验**：每个基线登记文件必须命中入库清单且指纹一致，未入库文件不得写入基线（清单多余条目=未被基线引用的资料，属正常不报错） |
+| `input_files` | 逐文件 `file`+`sha256`（Python 口径）；**登记本基线证据实际引用的文件**（入库清单的合法子集，未引用的入库文件不必登记）；机验提供 `--manifest` 时**逐条交叉校验**：每个基线登记文件必须命中入库清单且指纹一致，未入库文件不得写入基线（清单多余条目=未被基线引用的资料，属正常不报错） |
 | `requirements[].id` | `REQ-\d{3}`，任务内唯一 |
 | `risk` | 四值档位 `P0/P1/P2/P3`；映射口径：PRD「高」→P1、「中」→P2、「低」→P3（P0 预留给全景性缺陷，默认不用） |
 | `status` | 三态 `confirmed` / `needs_clarification` / `out_of_scope` |
@@ -106,11 +106,13 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 
 **依赖类需求（E-EXxx / NFRxx 等）的挂靠规则**：跨功能规则不单独出现在 selected_scope；以"主受益/首个适用"的选定功能落 `feature_id`，其余适用功能**直接在 `statement` 内一句声明**（如「另适用于 F03/F05」）；不设 `notes`、不设顶层 `coverage_summary`。
 
+**基线增补（TC 阶段增量，不解除冻结）**：阶段 8 体检发现影响需求/TP 判定的开发侧事实，经澄清闭环后可对已冻结基线**追加**条目——编号从现有 REQ 最大号续排，`feature_id` 落主受益/首个适用的选定功能（仍在 selected_scope 白名单内），`status=confirmed`；**首条证据必须是澄清证据** `{"clarification_id": "CL-xxx"}`（原文有原型可另加直引证据，"单条证据不得同时引原文与澄清"规则不变）；**禁止改动既有条目的任何字段**（口径差异在增补条目的 statement 内表述）。增补完成跑 `verify_requirement_baseline.py --freeze --clarifications <澄清记录> --manifest <指纹清单>`（`--clarifications` 必带：CL 证据无澄清记录即 FAIL；`--freeze` 保证全表无待澄清），由经理更新 status.md 冻结基线条目数。
+
 **澄清记录解析口径**：仅**行首**（允许 `|`/`>` 前缀）以 `CL-编号` 开头的行才作为该 CL 的专属记录行参与证据比对；正文/留痕行中提到的 CL 编号不参与解析——防留痕行污染登记表形成假 FAIL。
 
 顶层键白名单：`schema_version` / `selected_scope` / `input_files` / `requirements`——超出即结构违规。
 
-- `input_files` 指纹清单直接复制 `files-manifest.md`（Python 口径）；
+- `input_files` 指纹清单登记证据实际引用的文件（files-manifest 的合法子集，Python 口径，逐条命中且指纹一致）；
 - 冻结=TP 用户确认关口代为闭环（TP 确认时基线一并联签）；`verify_requirement_baseline.py --freeze` 通过方可冻结。
 
 ## 六、scope-list 机器契约

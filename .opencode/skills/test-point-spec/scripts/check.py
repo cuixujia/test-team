@@ -226,7 +226,7 @@ def main():
         if warn_step:
             steps.append(warn_step)
         else:
-            steps.append({"label": "quote-tp(skipped: 清单无直引引用，引文校验由基线机验覆盖)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
+            steps.append({"label": "quote-tp(skipped,如实声明: 清单无直引引用语法，TP 主件证据列未做逐字机验，语义关须抽验补充；不走基线机验)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
 
     # 2) TC 清单引文（2026-11-05 新增：字面保真必须有机验裁决）
     if args.phase in ("tc", "full"):
