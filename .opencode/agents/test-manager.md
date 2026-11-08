@@ -16,6 +16,9 @@ permission:
   bash:
     "*": deny
     "ls *": allow
+    "echo *": allow
+    "find *": allow
+    "tree *": allow
     "mkdir *": allow
     "shasum *": allow
     "sha256sum *": allow
