@@ -42,6 +42,7 @@ permission:
 ## 工作顺序
 
 0. **启动**：读当前生效安装位置的 agents/ 三份配置，提取各方可写路径与 shell 授权，落入 `state/status.md`「权限速查」；此后**不猜、不试、先查**。确认会话目录为 `file/<uuid>/`（与 project-docs 并列）；`project-docs/` 只读，禁止在其中创建会话产物子目录。
+   - **会话目录命名**：一律 `session-<项目id>-<6位随机数>`（000000~999999 随机流水号）。`<项目id>` 取所在运行时根目录名 `runtime_<projectId>` 的后缀。**编号一律由脚本随机生成，禁止手编、推算或照抄历史目录号**——跑 `python3 .opencode/skills/test-script-lib/scripts/new_session_dir.py --file-dir "workspace/runtime_*/file"`（skill 路径按生效安装位置取），脚本输出即会话目录，撞号由脚本自动重取，骨架目录随脚本铺好；`ls file/` 复核只是确认，不是取名手段。
 1. **恢复/建档 + 入库（fail-fast）**：先读 `state/status.md`。资料只收纯文本（md/markdown/txt/csv，UTF-8）：按 `prd-record-spec` 入库——`scan_outline.py` 生成 `scope/outline.md` 与 `scope/files-manifest.md`，并做规则编号对账（人工核对；登记 `status.md` 时标注「人工核对」）。发现 .docx/.pdf/图片等非文本件 → **一次性告知用户「替换为文本格式后再开工」并停止**，不代转。同时在 `state/scope-list.md` 预登记资料角色与归属登记种子（所属系统/业务活动取 PRD 原文逐字）。
 2. **轻扫描 + 选范围（用户关口）**：按 `outline.md` 列候选功能请用户选范围（**提供「默认全部纳入」**，不指定即全纳入）；同一关口一并确认资料角色登记。开工时预告全程等待次数（常规 4~6 次；用例缺件需裁决时另一次集中问询）。此时不做全资料深度质检。
 3. **范围闭合**：识别所选功能依赖的全局约束、跨功能引用一并纳入质检；扩围请用户决定。
@@ -68,6 +69,7 @@ python3 .opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py 
 - **授权核对（派发前置）**：派发单每个写入路径、每条命令先对照「权限速查」确认在目标角色 allow-list 内；不匹配当场改派发，**禁止发出去碰运气**。不代写专家产物（落盘受阻=暂不落盘＋状态簿引用，不是找人代写）。
 - **权限拒绝先定性**：拒绝是确定性的规则命中——①查管辖配置；②路径与规则不匹配=正确拦截，行为改道；应匹配却仍拒=异常才升级排查；向用户只传达确证结论。
 - **shell 仅三种形态**：`ls …` / `shasum|sha256sum …` / `python3 <skill>/scripts/<脚本>.py <参数>`；单命令、无分号/管道/变量/heredoc。skill 路径按生效安装位置取（本地 `.opencode/…`、服务端 `~/.config/…`），同一会话不混用；不满足即改用 write/grep/read。
+- **编号来源唯一**：会话目录名里的流水号只能来自 `new_session_dir.py` 的输出（脚本随机生成并查重）。命令被权限拒绝时按「权限拒绝先定性」处理（改道或出缺陷单），**禁止手编数字、凑号或用历史目录名折算**——目录名是事后追溯会话的唯一线索，编造即断链。
 - **指纹必须 Python 侧产出**（`scan_outline.py --manifest` 或机验脚本输出）；shell 的 `shasum` 与 Python 哈希口径可能不一致，**禁止用 shasum 登记指纹**，仅可粗查文件变化（不一致时以 Python 口径复核）。
 - 校验脚本一律经理侧执行；专家交稿只附「待补跑命令清单」，收回时统一机验并回填结果与指纹；输入指纹变化即暂停并评估影响范围。
 - **TP/TC 主件收回时核对头部「判据版本标注」行**（`判据版本 = test-knowledge @<日期>`，模板规范见 test-point-spec/test-case-spec）——缺标注即打回补行；标注日期与现行裁例通告（`补充-TP切分与命名判别.md`）不一致时触发判据变更联动评估（铁律见 AgentDesign），不自动全量重作。
