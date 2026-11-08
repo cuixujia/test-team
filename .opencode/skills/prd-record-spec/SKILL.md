@@ -111,14 +111,16 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 | `status=out_of_scope` | **必须**有非空 `reason` 字段 |
 | `evidence[]` | 二选一：①直引 `{file, lines, quote}`（lines=`596` 或 `596-598`，quote 正文逐字，标点/转义/空白按引用语法归一口径）；②澄清 `{clarification_id: "CL-xxx"}`——**quote 可选**（2026-11-05 收敛）：缺省时仅凭编号采信，填了才有指向性摘录（澄清记录行内 ≤40 字连续片段，归一口径比对）；**单条证据不得同时引原文与澄清** |
 
-**依赖类需求（E-EXxx / NFRxx 等）的挂靠规则**：跨功能规则不单独出现在 selected_scope；以"主受益/首个适用"的选定功能落 `feature_id`，其余适用功能在 `statement`/`notes` 声明，`coverage_summary` 登记功能→依赖映射。
+**依赖类需求（E-EXxx / NFRxx 等）的挂靠规则**：跨功能规则不单独出现在 selected_scope；以"主受益/首个适用"的选定功能落 `feature_id`，其余适用功能**直接在 `statement` 内一句声明**（如「另适用于 F03/F05」）。不再设 `notes` 与顶层 `coverage_summary`（2026-11-08 瘦身：脚本零消费、docs 单点提及，砍去双记账）。
 
 **澄清记录解析口径（2026-11-05 收敛）**：仅**行首**（允许 `|`/`>` 前缀）以 `CL-编号` 开头的行才作为该 CL 的专属记录行参与证据比对；正文/留痕行中提到的 CL 编号不参与解析——避免留痕行污染登记表形成假 FAIL（已实测复现并定案）。
 
-顶层键白名单：`schema_version` / `selected_scope` / `meta` / `input_files` / `requirements` / `coverage_summary`——超出即结构违规（一致性单测 `tests/test_contract_sync.py` 锁定）。
+顶层键白名单：`schema_version` / `selected_scope` / `input_files` / `requirements`——超出即结构违规（2026-11-08 瘦身：`meta` / `coverage_summary` 废除，两键无脚本消费方，见字段消费方清单）。
 
 - `input_files` 指纹清单直接复制 `files-manifest.md`（Python 口径）；
 - 冻结=TP 用户确认关口代为闭环（TP 确认时基线一并联签）；`verify_requirement_baseline.py --freeze` 通过方可冻结。
+
+> **产物瘦身注（2026-11-08）**：QA 各类报告（资料体检/对账/产物质检）统一写入 `output/reports/qa-report.md` 分节；旧单件 `tp-input-check.md` / `baseline-reconcile.md` / `tc-input-check.md` 等已废止。`scope-list.md` 机器契约本节不变，结构勿动。基线字段经逐字段消费方清单核对后定稿如上（`meta`/`coverage_summary`/`notes` 三键废除）。
 
 ## 六、scope-list 机器契约（2026-11-05 收敛）
 

@@ -28,33 +28,37 @@
 1. **阶段 1：资料入库（fail-fast）**：`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
 2. **阶段 2：轻扫描、选范围**：依据 outline.md 列出候选功能与规则编号索引；用户选范围时一并确认资料角色，之后才做深度质检。
 3. **阶段 2 尾：范围闭合**（无独立阶段号，随阶段 2 收口）：补入相关全局约束和跨功能依赖；仅对本次范围及依赖质检。
-4. **阶段 3：资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单落盘 `output/reports/tp-input-check.md`；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
+4. **阶段 3：资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单写入 `output/reports/qa-report.md` 的「§阶段3 资料体检」节（收尾基线对账也并入本节）；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
 5. **阶段 4：集中澄清**：QA 澄清候选与基线占位合并一次询问；结论登记 `CL-xxx`。**影响 TP 判定的澄清闭环后，TP 才生成**（仅影响 TC 数据构造的缺件项登记即可放行）。
 6. **阶段 5：生成测试点**：设计专家基于落盘基线、CL 结论与阶段 3 报告生成测试点。
 7. **阶段 6/7：机验+质检+修复闭环+出表+用户确认**：`check.py --phase tp` 机验（阶段 6）PASS 后，质检以**主件＋机验工件**做语义关；**修复闭环（一次打包单轮修完→增量机验→终轮全量机验 PASS）后**，经理才生成测试点数据视图 `test-point-table.md`，**以 table 为载体**交用户确认（阶段 7；确认即代基线联签冻结）；确认时的删改意见由经理映射回主件、修订后重导 table。
-8. **阶段 8：用例资料质检（先行）**：检查开发设计主资料可测性与缺件，报告落盘 `output/reports/tc-input-check.md`；缺件经澄清闭环或让步留痕后用例分支才启动。
-9. **阶段 10/11/12：生成 TC＋质检＋修复闭环＋确认**：基于确认 TP、阶段 8 结论和开发设计主资料生成 TC（阶段 10）；`check.py --phase full` 全量机验 PASS 后质检以主件＋机验工件做语义关（阶段 11），**修复闭环且终轮全量机验 PASS 后**经理出 `test-case-table.md`，以 table 载体交用户确认（阶段 12）。
+8. **阶段 8：用例资料质检（先行）**：检查开发设计主资料可测性与缺件，写入 `qa-report.md` 的「§阶段8 用例资料体检」节；缺件经澄清闭环或让步留痕后用例分支才启动。
+9. **阶段 10/11/12：生成 TC＋质检＋修复闭环＋确认**：基于确认 TP、阶段 8 结论和开发设计主资料生成 TC（阶段 10）；`check.py --phase full` 全量机验 PASS 后质检以主件＋机验工件做语义关（阶段 11，结论写入 `qa-report.md`「§阶段11 测试用例质检」节），**修复闭环且终轮全量机验 PASS 后**经理出 `test-case-table.md`，以 table 载体交用户确认（阶段 12）。
 10. **修复与变更**（贯穿阶段，无编号）：按问题 ID 和追溯关系增量修复（修复单一次性打包，见 AgentDesign 质检收敛），最终全量校验；资料指纹变化（以 Python 口径为准）时暂停并重评影响范围。
 
 用户正式确认只有 TP 和 TC 两处，载体均为 table 数据视图。真正需要用户决策的问题必须等待，不能猜答案。
 
-## 核心产物
+## 核心产物（10 份持久，2026-11-08 瘦身）
 
 ```text
-scope/files-manifest.md            # 文本资料指纹清单（Python 侧 sha256）
-scope/outline.md                   # 轻扫描：标题树+规则编号索引
-scope/requirements-baseline.json   # 结构化需求、input_files 指纹、来源证据（文件:行号+原话）、风险与状态
+# 用户交互面
+scope/outline.md                   # 资料地图：标题树+规则编号索引（阶段 2 选范围用）
+state/scope-list.md                # 功能范围 + 资料角色登记 + 归属登记（机器契约，脚本消费）
+state/clarifications.md            # 澄清问答（CL-xxx），兼待澄清缺件登记
+output/tp/test-point-table.md      # 测试点确认载体（仅一张表；export_tables.py 派生，确认关口前才生成）
+output/tc/test-case-table.md       # 测试用例确认载体（同上）
+
+# 静默落盘（可查）
+state/status.md                    # 经理唯一状态簿：登记/进度/结论 + 尾部「流水账」节（异常一行一条，2026-11-08 并入 process-log）
+scope/requirements-baseline.json   # 结构化需求、input_files 指纹、来源证据（文件:行号+原话）
 output/tp/test-point.md            # 含需求→TP 覆盖表（唯一权威；证据→TP 由机验自动推导）
-output/tp/test-point-table.md      # 测试点数据视图（仅一张表；export_tables.py 派生，确认载体，主件变更重导即刷新）
 output/tc/test-case.md             # 含 TP→TC 覆盖表；TC 可关联主 TP 和相关 TP（唯一权威）
-output/tc/test-case-table.md       # 测试用例数据视图（仅一张表；确认载体，主件变更重导即刷新）
-output/reports/check-tp.json       # TP 机验报告（+ .quotes-tp.json：TP 引文逐字明细）
-output/reports/check-tc.json       # TC 机验报告（+ .quotes-tc.json：TC 引文逐字明细）
-output/reports/check-full.json     # 最终全量兜底结果
-output/reports/*-check.md          # 独立语义质检报告（一条问题=一句事实一处证据）
-output/reports/baseline-reconcile.md        # 阶段 3 基线对账结论（QA 独立任务，一句结论+要点清单；对账发现的问题并入修复单）
-state/process-log.md               # 过程轻量留痕：单行一条「日期|阶段|结果|异常一句话」（经理独占写）
+output/reports/qa-report.md        # 全流程唯一 QA 报告，分节追加：§阶段3 资料体检（含基线对账）/§阶段6 测试点质检/§阶段8 用例资料体检/§阶段11 测试用例质检；每节落盘后只读，每条问题=修复单格式
 ```
+
+**脚本工作文件（照常生成，不列产物、不主动展示）**：`check-tp.json`、`check-tc.json`、`check-full.json`（+ `.quotes-*.json` 引文逐字明细）——机验工件，质检按指纹采信；`files-manifest.md`——纯文本资料指纹清单（Python 侧 sha256）。
+
+> 旧五份报告文件（`tp-input-check.md`、`tc-input-check.md`、`tp-check.md`、`tc-check.md`、`baseline-reconcile.md`）与 `state/process-log.md` 已废止，新任务一律写 `qa-report.md` 对应节与 `status.md` 流水账。
 
 ## 脚本
 
