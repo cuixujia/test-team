@@ -22,14 +22,23 @@ description: 测试流程机器脚本的共享代码库（mdtable 表格解析/�
 
 **主表定位契约**：`parse_md_table` 的主表 = 第一个 `##` 章节之前的表（进入下一章节即结束）。
 
+### scripts/new_session_dir.py — 会话目录生成
+
+按命名规范 `session-<项目id>-<6位随机数>` 新建会话目录并铺好骨架（`user-input`/`scope`/`state`/`output/{tp,tc,reports}`），输出目录路径。`<项目id>` 从上级目录 `runtime_<项目id>` 取后缀；流水号取 6 位随机数（000000~999999），与既有目录撞号则自动重取，绝不覆盖既有目录。
+
+**归属说明**：本脚本是经理侧唯一可用的会话目录命名入口——经理的 shell 授权只放行 `python3 <skill>/scripts/<脚本>.py <参数>` 一类形态，编号只能由脚本的随机数生成器产出并查重；agent 不得手编、凑号或照抄历史目录号。
+
 ## 消费方（只读引用，二次分布声明）
 
 - `test-point-spec/scripts/check.py`、`verify_traceability.py`、`verify_test_points.py`
 - `test-case-spec/scripts/verify_test_cases.py`
 - `prd-record-spec/scripts/verify_requirement_baseline.py`、`verify_quotes.py`
+- `test-manager`（会话目录生成，唯一调用方）
 
 ## 维护规则
 
 1. 任何校验脚本不得定义 `def parse_md_table(` 或 `def parse_first_table(`（`tests/test_contract_sync.py` 断言）；
 2. 归一口径与表解析规则改动只在本 skill 进行，改后必须跑 `tests/test_contract_sync.py`；
-3. 引用方 SKILL.md 一律指向 `test-script-lib/scripts/mdtable.py`，不再使用其他路径写法。
+3. 引用方 SKILL.md 一律指向 `test-script-lib/scripts/mdtable.py`，不再使用其他路径写法；
+4. 会话目录命名规范的改动（项目id 取法、时刻格式、骨架清单）只在本 skill 与 `test-manager` 的会话目录命名条款同步进行，改后必须跑 `tests/test_new_session_dir.py`。
+

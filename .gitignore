@@ -3,4 +3,5 @@ __pycache__/
 *.py[cod]
 workspace/runtime_demo/file/project-docs/prd-demo.md
 workspace/runtime_demo/file/sess-demo-0001/
-workspace/runtime_demo/file/sess-*/
+workspace/runtime_demo/file/session-*/
+xsession-demo-261108164134
