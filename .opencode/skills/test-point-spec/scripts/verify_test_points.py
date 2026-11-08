@@ -2,7 +2,7 @@
 """verify_test_points.py — 测试点清单机械校验（纯文本直引，V2 唯一流程）
 
 校验项：
-  1. 编号格式 TP-NNN、唯一、连续
+  1. 编号格式 TP-NNN、唯一（允许空号）
   2. 验证意图以「验证」开头
   3. 必填字段非空（验证意图/类型/分析方法/依据）
   4. 依据证据项校验（每项必须是行首证据 token）：
@@ -109,7 +109,7 @@ def main():
     if header != ["编号", "验证意图", "类型", "分析方法", "依据（文件:行号+原话）"]:
         print(f"[FAIL] 测试点清单列序不符合契约: {header}")
 
-    # 1) 编号格式 / 唯一 / 连续
+    # 1) 编号格式 / 唯一（允许空号）
     ids = [r[0] for r in main_rows]
     bad_fmt = [i for i in ids if not re.fullmatch(r"TP-\d{3}", i)]
     if bad_fmt:
@@ -121,11 +121,6 @@ def main():
         fail(f"TP 编号重复: {' '.join(sorted(dup))}")
     else:
         ok("TP 编号唯一性校验通过")
-    nums = sorted(int(i.split("-")[1]) for i in ids if re.fullmatch(r"TP-\d{3}", i))
-    if nums and nums != list(range(nums[0], nums[0] + len(nums))):
-        fail(f"TP 编号不连续: {nums}")
-    elif nums:
-        ok("TP 编号连续性校验通过")
 
     # 2) 验证意图以「验证」开头
     bad = [f"{r[0]}:{r[1]}" for r in main_rows if r[1] and not r[1].startswith("验证")]

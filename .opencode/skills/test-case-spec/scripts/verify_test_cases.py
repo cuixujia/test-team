@@ -2,7 +2,7 @@
 """verify_test_cases.py — 测试用例清单机械校验
 
 校验项：
-  1. 编号格式 TC-NNN、唯一、连续
+  1. 编号格式 TC-NNN、唯一（允许空号）
   2. 必填字段非空（标题/关联TP/优先级/前置条件/测试数据/操作步骤/预期结果/用例类型/标签）
   3. 优先级取值 P0-P3
   4. 关联TP 引用完整性（必须存在于测试点清单）
@@ -179,11 +179,6 @@ def main():
         fail(f"TC 编号重复: {' '.join(sorted(dup))}")
     else:
         ok("TC 编号唯一性校验通过")
-    nums = sorted(int(i.split("-")[1]) for i in ids if re.fullmatch(r"TC-\d{3}", i))
-    if nums and nums != list(range(nums[0], nums[0] + len(nums))):
-        fail(f"TC 编号不连续: {nums}")
-    elif nums:
-        ok("TC 编号连续性校验通过")
 
     # 2) 必填字段
     labels = [(1, "标题"), (2, "关联TP"), (3, "优先级"), (4, "前置条件"),
