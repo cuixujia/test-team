@@ -12,17 +12,15 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 
 1. **格式确认**：资料目录内**只收文本格式**。发现 .docx/.pdf/图片等非文本件 →
    **一次性告知用户「请替换为文本格式后再开工」并停止流程**；AI 不代转、无遗留分支。
-2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；产物同步在 `state/status.md` 登记资料指纹段落，引用 files-manifest）：
+2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；指纹段落同步登记 `state/status.md`）：
 
    ```bash
    python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/scan_outline.py \
-   # 本地：python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
-   # 服务端：python3 ~/.config/opencode/skills/prd-record-spec/scripts/scan_outline.py \
      --input-dir <资料目录> --output <会话目录>/scope/outline.md \
      --manifest <会话目录>/scope/files-manifest.md
    ```
 
-   `shasum` 仅可用于粗查文件变化（发现不一致时以 Python 口径复核），**禁止用 shasum 登记指纹**。
+   （前缀按生效安装位置：本地 `.opencode/…`、服务端 `~/.config/…`，本节所有命令同此；`shasum` 仅可粗查变化，禁止用于登记指纹。）
 3. **规则编号对账**：`outline.md` 中规则编号索引（BR/GOAL/EXCL/NFR/…）与文档自身附表核对，
    若缺失 → 资料本身残缺，入库即拦截。
 4. **资料角色登记**（1 次，用户选范围关口顺手确认）：
@@ -55,14 +53,12 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 
 | 规则 | 说明 |
 |---|---|
-| 摘录长度 | **≤40 字**连续原文；确需跨行时写行区间 `L279-L280`，摘录用单空格连接 |
-| 正文逐字 | 摘录的**汉字/字母/数字内容**须与原文件该行一致（含 Markdown 标记中影响文本部分），禁止拷贝渲染后文本 |
-| 表示法归一（2026-11-05 收敛） | **空白、全/半角标点、引号形制、Markdown 表格 `\|` 转义**属表示法差异：比对两侧均按 `test-script-lib/scripts/mdtable.py` 的 `norm_quote` 归一，**不再判 FAIL、不需人修、不需留痕** |
-| 摘录自愈（--autofix） | 行号指向正确、仅摘录正文缺字/误植时，机验按**行号回读原文自动回填**并自愈 PASS（产物内旧摘录唯一时原位回写）；留痕由机验报告工件 `auto_fixes` 字段自动承载，**零人工修复轮** |
-| 真问题口径 | 只有**行号指错**（定位与内容不符）才 FAIL → 只定点修复那一条 |
+| 摘录长度 | **≤40 字**连续原文；跨行写行区间 `L279-L280`，摘录用单空格连接 |
+| 正文逐字 | 摘录的**汉字/字母/数字内容**与原文件该行一致，禁止拷贝渲染后文本 |
+| 表示法差异自动消化 | 空白、全/半角标点、引号形制、Markdown `\|` 转义由机验 `norm_quote` 归一——不是错误，不需人修留痕（算法细节见 `verify_quotes.py` 头注释） |
+| 行号才是锚 | 行号正确、摘录缺字误植时 `--autofix` 按行号回读原文自动回填；**只有行号指错才 FAIL**，只定点修那一条 |
 | 跨行摘录 | 摘录须包含第二行的行首标记（如列表符 `- `），因原文行连接后含此后缀 |
-| 上下文 | 每条摘录登记时须核对前后各 1 行（`verify_quotes.py --context` 打印），防断章取义 |
-| 重复行 | 引用自带行号即可消歧；禁止"行内找相近句"的近似摘录 |
+| 登记 | 摘录登记时用 `verify_quotes.py --context` 核对前后各 1 行，防断章；引用自带行号即可消歧，禁止"行内找相近句"的近似摘录 |
 
 ## 四、机验（零语义，脚本执行）
 
@@ -73,15 +69,12 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 
 > 命令前缀按当前生效安装位置取：本地 `.opencode/skills/…`，服务端 `~/.config/opencode/skills/…`（本节所有命令同此规则）。
 
-- 引用表可为 Markdown 管道表（表头契约：首列=`来源文件`、次列=`行号`）或 JSON 数组；
-- 加 `--extract-from` 直接按引用语法从清单抽引用，免维护引用表；
-- 加 `--report` 将结果落 JSON 工件（含清单指纹、失败明细与 `auto_fixes` 自愈留痕）——**机器关采信以工件为准**，stdout 不作为采信依据；
-- 加 `--autofix` 启用**摘录自愈**：行号正确且内容骨架命中 → 按行号回读原文回填摘录（源文件为产物且旧摘录唯一时原位回写）；回答"改＝不浪费时间"（2026-11-05 收敛）；
-- **增量机验**：修复轮经 `check.py --only quote-tp,...` 只跑受影响步骤；终轮一次全量兜底——**改行字不必五关重跑**（2026-11-05 收敛）；
-- **质检报告内引文不重复机验**（2026-11-05 收敛）：产物证据本体已随机验管线裁决；报告内复引改由引文复核契约的**定向抽查**覆盖，不再作为机验对象；
-- FAIL（现仅指"行号指错/骨架不命中"）必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**。
-- **交付机验统一入口**：`test-point-spec/scripts/check.py`（TP/TC 清单引文、基线、结构、追溯、报告新鲜度、覆盖对照表自动推导一次跑完出一份报告）；`verify_quotes.py` 亦可单独运行。
-- 澄清触发与覆盖校验沿用 `test-point-spec/scripts/check.py` 内的追溯步骤（原 verify_traceability）。
+- 引用表可为 Markdown 管道表（表头契约：首列=`来源文件`、次列=`行号`）或 JSON 数组；`--extract-from` 直接按引用语法从清单抽引用，免维护引用表；
+- `--report` 落 JSON 工件（含清单指纹、失败明细、`auto_fixes` 留痕）——**机器关采信以工件为准**，stdout 不作数；`--autofix` 自愈（源文件为产物且旧摘录唯一时原位回写）；
+- **增量机验**：修复轮经 `check.py --only <受影响步骤>` 只跑受影响步骤，终轮一次全量兜底；
+- **质检报告内引文不重复机验**：产物证据本体已随机验管线裁决，报告内复引由「定向抽查」（见质检契约）覆盖；
+- FAIL 仅指「行号指错/骨架不命中」，必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**；
+- **交付机验统一入口**：`test-point-spec/scripts/check.py`（一次跑完出一份报告）；`verify_quotes.py` 亦可单独运行；澄清触发与覆盖校验沿用其内置追溯步骤。
 
 ## 五、需求基线（结构契约，证据=直引）
 
@@ -96,7 +89,7 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 }
 ```
 
-校验器 `verify_requirement_baseline.py` 的硬性契约（2026-11-05 全量落档，此前散落在脚本内）：
+校验器 `verify_requirement_baseline.py` 的硬性契约：
 
 | 字段 | 契约 |
 |---|---|
@@ -109,20 +102,18 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 | `status=confirmed` | **必须**至少一条证据 |
 | `status=needs_clarification` | **必须**有非空 `question` 字段（写明待澄清问题，不自解释） |
 | `status=out_of_scope` | **必须**有非空 `reason` 字段 |
-| `evidence[]` | 二选一：①直引 `{file, lines, quote}`（lines=`596` 或 `596-598`，quote 正文逐字，标点/转义/空白按引用语法归一口径）；②澄清 `{clarification_id: "CL-xxx"}`——**quote 可选**（2026-11-05 收敛）：缺省时仅凭编号采信，填了才有指向性摘录（澄清记录行内 ≤40 字连续片段，归一口径比对）；**单条证据不得同时引原文与澄清** |
+| `evidence[]` | 二选一：①直引 `{file, lines, quote}`（lines=`596` 或 `596-598`，quote 正文逐字）；②澄清 `{clarification_id: "CL-xxx"}`——**quote 可选**：缺省仅凭编号采信，填了才有指向性摘录（澄清记录行内 ≤40 字连续片段）；**单条证据不得同时引原文与澄清** |
 
-**依赖类需求（E-EXxx / NFRxx 等）的挂靠规则**：跨功能规则不单独出现在 selected_scope；以"主受益/首个适用"的选定功能落 `feature_id`，其余适用功能**直接在 `statement` 内一句声明**（如「另适用于 F03/F05」）。不再设 `notes` 与顶层 `coverage_summary`（2026-11-08 瘦身：脚本零消费、docs 单点提及，砍去双记账）。
+**依赖类需求（E-EXxx / NFRxx 等）的挂靠规则**：跨功能规则不单独出现在 selected_scope；以"主受益/首个适用"的选定功能落 `feature_id`，其余适用功能**直接在 `statement` 内一句声明**（如「另适用于 F03/F05」）；不设 `notes`、不设顶层 `coverage_summary`。
 
-**澄清记录解析口径（2026-11-05 收敛）**：仅**行首**（允许 `|`/`>` 前缀）以 `CL-编号` 开头的行才作为该 CL 的专属记录行参与证据比对；正文/留痕行中提到的 CL 编号不参与解析——避免留痕行污染登记表形成假 FAIL（已实测复现并定案）。
+**澄清记录解析口径**：仅**行首**（允许 `|`/`>` 前缀）以 `CL-编号` 开头的行才作为该 CL 的专属记录行参与证据比对；正文/留痕行中提到的 CL 编号不参与解析——防留痕行污染登记表形成假 FAIL。
 
-顶层键白名单：`schema_version` / `selected_scope` / `input_files` / `requirements`——超出即结构违规（2026-11-08 瘦身：`meta` / `coverage_summary` 废除，两键无脚本消费方，见字段消费方清单）。
+顶层键白名单：`schema_version` / `selected_scope` / `input_files` / `requirements`——超出即结构违规。
 
 - `input_files` 指纹清单直接复制 `files-manifest.md`（Python 口径）；
 - 冻结=TP 用户确认关口代为闭环（TP 确认时基线一并联签）；`verify_requirement_baseline.py --freeze` 通过方可冻结。
 
-> **产物瘦身注（2026-11-08）**：QA 各类报告（资料体检/对账/产物质检）统一写入 `output/reports/qa-report.md` 分节；旧单件 `tp-input-check.md` / `baseline-reconcile.md` / `tc-input-check.md` 等已废止。`scope-list.md` 机器契约本节不变，结构勿动。基线字段经逐字段消费方清单核对后定稿如上（`meta`/`coverage_summary`/`notes` 三键废除）。
-
-## 六、scope-list 机器契约（2026-11-05 收敛）
+## 六、scope-list 机器契约
 
 `state/scope-list.md` 兼做机器输入，结构是契约的一部分：
 
@@ -134,7 +125,9 @@ python3 <按当前生效安装位置>/skills/prd-record-spec/scripts/verify_quot
 
 三张表的结构被上表消费方解析；任何其他表不参与机器解析（留痕用）。
 
-**章节定位契约（2026-11-06 复盘收敛）**：三张表（功能清单/资料角色登记/归属登记）**必须各自置于一个 `##` 章节标题之下**，且功能清单为**第一个 `##` 章节下的第一张表**——解析器（`mdtable.parse_first_table` 等）按章节边界取表，首表若裸置于章节标题之外会与后续表合并解析，造成列位错乱与假泄漏误报（fixture 口径：`tests/test_check_pipeline.py` 的「## 一、功能清单 / ## 二、资料角色登记 / ## 三、归属登记」）。
+**章节定位契约**：三张表（功能清单/资料角色登记/归属登记）**必须各自置于一个 `##` 章节标题之下**，且功能清单为**第一个 `##` 章节下的第一张表**——解析器按章节边界取表，首表裸置于章节标题之外会与后续表合并解析（fixture 参考 `tests/test_check_pipeline.py`：`## 一、功能清单 / ## 二、资料角色登记 / ## 三、归属登记`）。
+
+> QA 各类报告（资料体检/对账/产物质检）统一写入 `output/reports/qa-report.md` 分节（qa 载体契约见 test-qa-expert）。
 
 ## 七、任务期封版
 
