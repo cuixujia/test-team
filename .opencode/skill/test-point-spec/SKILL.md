@@ -137,6 +137,6 @@ python3 ~/.config/opencode/skill/test-point-spec/scripts/export_tables.py --phas
 
 ## 交付与变更
 
-- 交付不得出现业务功能编号（归属用名称原文）；交付前运行 `check.py --phase tp --report <output/reports/check-tp.json>`，FAIL 修复重跑；摘录逐字复制，保真由 `verify_quotes.py` 裁决，定位可用 grep/read 或 `extract_excerpt.py`。
+- 交付不得出现业务功能编号（归属用名称原文）；交付前机验 `check.py --phase tp --report <output/reports/check-tp.json>` 由 QA 收稿时执行（生成者交稿附命令清单，不自行运行），FAIL 修复重跑；摘录按 `extract_excerpt.py` 输出逐字复制，保真由 `verify_quotes.py` 裁决，定位可用 grep/read 或 `extract_excerpt.py`。
 - 阶段 7 验收：**用户删改的行即刻生效、不回炉复检**（经理记录差异到状态档案）；如需继续修订，只对**受影响行**增量复检（终轮全量兜底），编号只增不改不复用。
 - 设计材料变更 → 受影响 TP 标记失效，失效 TP 禁止派生 TC；用户澄清「没说清」的问题后 → 重合并/拆分受影响 TP 并增量复检；TP 基线错误经用户确认 → 回阶段 5 受控变更（编号只增不复用；失效行整行移除，编号永久空置、不得复用）。

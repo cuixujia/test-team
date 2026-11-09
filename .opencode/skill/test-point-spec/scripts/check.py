@@ -142,7 +142,8 @@ def run(label, command, artifacts, extra_scripts=()):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phase", choices=("tp", "tc", "full"), required=True)
-    parser.add_argument("--input-dir", required=True, help="资料目录（纯文本：md/markdown/txt/csv）")
+    parser.add_argument("--input-dir", required=True, nargs="+",
+                        help="资料目录（可传多个：文本资料目录 + 会话转换区 user-input-converted）")
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--quote-table", default="", help="引文机验输入覆盖；缺省时直接从 tp/tc 清单按引用语法抽引用")
     parser.add_argument("--scope-list", default="")
@@ -218,7 +219,7 @@ def main():
     if args.quote_table or CITE_SCAN.search(_text_of(tp_quote_src)):
         if want("quote-tp"):
             qr_tp = quote_report_path("tp")
-            steps.append(run("quote-tp", [sys.executable, tools["quotes"], tp_quote_src, "--input-dir", args.input_dir, "--extract-from", "--report", qr_tp, "--autofix"], [tp_quote_src, qr_tp]))
+            steps.append(run("quote-tp", [sys.executable, tools["quotes"], tp_quote_src, "--input-dir", *args.input_dir, "--extract-from", "--report", qr_tp, "--autofix"], [tp_quote_src, qr_tp]))
         else:
             steps.append(skipped("quote-tp", "--only 增量机验未选中"))
     else:
@@ -236,7 +237,7 @@ def main():
             elif CITE_SCAN.search(_text_of(args.tc_file)):
                 if want("quote-tc"):
                     qr_tc = quote_report_path("tc")
-                    steps.append(run("quote-tc", [sys.executable, tools["quotes"], args.tc_file, "--input-dir", args.input_dir, "--extract-from", "--report", qr_tc, "--autofix"], [args.tc_file, qr_tc]))
+                    steps.append(run("quote-tc", [sys.executable, tools["quotes"], args.tc_file, "--input-dir", *args.input_dir, "--extract-from", "--report", qr_tc, "--autofix"], [args.tc_file, qr_tc]))
                 else:
                     steps.append(skipped("quote-tc", "--only 增量机验未选中"))
             else:
@@ -247,7 +248,7 @@ def main():
                     steps.append({"label": "quote-tc(skipped: TC 清单无直引引用)", "command": [], "exit_code": 0, "stdout": "", "stderr": "", "duration_seconds": 0.0, "artifacts": {}, "scripts": {}})
 
     if want("requirements-baseline"):
-        baseline_command = [sys.executable, tools["baseline"], args.baseline, "--input-dir", args.input_dir, "--freeze"]
+        baseline_command = [sys.executable, tools["baseline"], args.baseline, "--input-dir", *args.input_dir, "--freeze"]
         if args.clarifications:
             baseline_command += ["--clarifications", args.clarifications]
         if args.manifest:
@@ -259,7 +260,7 @@ def main():
 
     if args.phase in ("tp", "full"):
         if want("test-points"):
-            tp_command = [sys.executable, tools["tp"], args.tp_file, "--input-dir", args.input_dir]
+            tp_command = [sys.executable, tools["tp"], args.tp_file, "--input-dir", *args.input_dir]
             if args.scope_list:
                 tp_command += ["--scope-list", args.scope_list]
             if args.clarifications:
@@ -276,7 +277,7 @@ def main():
         if not args.tc_file:
             parser.error("--phase tc/full 必须提供 --tc-file")
         if want("test-cases"):
-            tc_command = [sys.executable, tools["tc"], args.tc_file, "--tp-file", args.tp_file, "--prd-dir", args.input_dir, "--scope-list", args.scope_list]
+            tc_command = [sys.executable, tools["tc"], args.tc_file, "--tp-file", args.tp_file, "--prd-dir", *args.input_dir, "--scope-list", args.scope_list]
             steps.append(run("test-cases", tc_command, [args.tc_file, args.tp_file, args.scope_list]))
         else:
             steps.append(skipped("test-cases", "--only 增量机验未选中"))

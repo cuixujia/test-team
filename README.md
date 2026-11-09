@@ -18,14 +18,16 @@
 
 ## 资料约定（唯一流程）
 
-- **只收可定位行号的文本格式**（md/markdown/txt/csv）。发现 docx/pdf/图片等非文本件 → 一次性告知用户替换后再开工，AI 不代转，**无遗留分支**。
+- **只收可定位行号的文本格式**（md/markdown/txt/csv）。发现 docx/xlsx → 经理在阶段 1 先跑
+  `convert_office.py` 转成 md（落会话 `user-input-converted/`，转换 md 即唯一文本权威，原件只读存档
+  禁止引用）；转换失败或出现 doc/pdf/图片等件 → 一次性告知用户替换后再开工，AI 不代转，**无遗留分支**。
 - **资料角色主从**（入库登记、选范围确认）：TP 阶段 PRD 为主、其余为辅；TC 阶段开发设计资料为主、PRD 为辅；「主资料有言、辅资料相悖且影响 TP/TC 判定」才进澄清单。
 
 ## 工作流
 
 阶段的规范编号以 skills 体系为准：3=资料质检、4=澄清、5=TP 生成、6=TP 质检、7=TP 确认、8=用例资料质检、10=TC 生成、11=TC 质检、12=TC 确认；资料入库与范围步骤为 1/2。下表步骤序号仅用于本列表叙述，不作为阶段号引用（历史文档中的「阶段 N 报告」等指 skills 体系编号）。
 
-1. **阶段 1：资料入库（fail-fast）**：`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
+1. **阶段 1：资料入库（fail-fast）**：目录内发现 docx/xlsx → 先用 `convert_office.py` 转成 md（落会话 `user-input-converted/`，转换 md 与原文本目录都属资料范围；转换失败或出现 doc/pdf/图片等件先告知用户替换）；`scan_outline.py` 生成 `scope/outline.md`（标题树+规则编号索引）与 `scope/files-manifest.md`（Python 侧 sha256 指纹清单，与机验同口径），规则编号对账；非文本件即拦截；预登记资料角色。
 2. **阶段 2：轻扫描、选范围**：依据 outline.md 列出候选功能与规则编号索引；用户选范围时一并确认资料角色，之后才做深度质检。
 3. **阶段 2 尾：范围闭合**（无独立阶段号，随阶段 2 收口）：补入相关全局约束和跨功能依赖；仅对本次范围及依赖质检。
 4. **阶段 3：资料质检 ‖ 基线整理（两路并行）**：QA 按角色主从深度检查范围内 PRD 与开发资料，问题单写入 `output/reports/qa-report.md` 的「§阶段3 资料体检」节（收尾基线对账也并入本节）；设计专家同时整理 `scope/requirements-baseline.json`（证据=`文件:行号`+原话，**复述不判读**，含糊项挂 `needs_clarification`）。QA 报告收尾核对基线（先独立提单）。技术资料缺失只阻塞 TC，不阻塞 TP。
