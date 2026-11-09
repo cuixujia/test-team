@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SC = os.path.join(ROOT, ".opencode", "skills", "prd-record-spec", "scripts")
+SC = os.path.join(ROOT, ".opencode", "skill", "prd-record-spec", "scripts")
 BASELINE = os.path.join(SC, "verify_requirement_baseline.py")
 SCAN = os.path.join(SC, "scan_outline.py")
 

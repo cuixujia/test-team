@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "export_tables.py")
+SCRIPT = os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts", "export_tables.py")
 
 TP_MD = """# 示例测试点清单
 

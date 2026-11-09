@@ -16,8 +16,8 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SC = os.path.join(ROOT, ".opencode", "skills", "prd-record-spec", "scripts")
-TCS = os.path.join(ROOT, ".opencode", "skills", "test-case-spec", "scripts")
+SC = os.path.join(ROOT, ".opencode", "skill", "prd-record-spec", "scripts")
+TCS = os.path.join(ROOT, ".opencode", "skill", "test-case-spec", "scripts")
 
 
 def load(name, path):

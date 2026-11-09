@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_prompt_hygiene.py — 提示词洁净锁（2026-11-08 瘦身整改的回归护栏）。
 
-提示词层（agents/*.md 与 skills/*/SKILL.md，test-knowledge 豁免）只允许存在
+提示词层（agent/*.md 与 skill/*/SKILL.md，test-knowledge 豁免）只允许存在
 "当前有效规则与判据"，四类记录性内容一旦写回即 FAIL：
 
   1. 日期注记：`2026-11-05 收敛` 类括号——溯源单处记账于 AgentDesign 决策记录；
@@ -29,17 +29,17 @@ BANNED = [
     (r"tp-machine-check|tc-machine-check|machine-full", "旧机验报告名提及违规"),
     (r"tp-input-check|tc-input-check|tp-check\.md|tc-check\.md|baseline-reconcile", "废止报告文件名提及违规（qa-report.md 已取代）"),
     (r"process-log", "process-log 已并入 status.md 流水账节"),
-    (r"skills/_lib|opencode/_lib", "旧 _lib 路径提及违规（唯一实现在 test-script-lib）"),
+    (r"skill/_lib|opencode/_lib", "旧 _lib 路径提及违规（唯一实现在 test-script-lib）"),
 ]
 
 
 def prompt_files():
     files = []
-    agents = os.path.join(ROOT, ".opencode", "agents")
+    agents = os.path.join(ROOT, ".opencode", "agent")
     for name in sorted(os.listdir(agents)):
         if name.endswith(".md"):
             files.append(os.path.join(agents, name))
-    skills = os.path.join(ROOT, ".opencode", "skills")
+    skills = os.path.join(ROOT, ".opencode", "skill")
     for skill in sorted(os.listdir(skills)):
         if skill in EXEMPT_DIRS:
             continue

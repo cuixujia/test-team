@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CHECK = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "check.py")
+CHECK = os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts", "check.py")
 
 PRD = """# 产品需求说明书
 验证登录需密码校验规则。

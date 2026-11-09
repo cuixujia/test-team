@@ -16,8 +16,8 @@ import tempfile
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CHECK = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "check.py")
-EXPORT = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "export_tables.py")
+CHECK = os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts", "check.py")
+EXPORT = os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts", "export_tables.py")
 
 PRD = """# 产品需求说明书
 所属系统：测试系统 ｜ 所属业务活动：登录活动 ｜ 所属业务功能：登录展示
@@ -166,12 +166,12 @@ class TestCheckPipeline(unittest.TestCase):
     def test_master_table_contract_consistent_across_consumers(self):
         # 主契约（第一个 ## 前的主表）对 verify_test_points / verify_test_cases / export_tables 一致生效
         tp_out = subprocess.run(
-            [sys.executable, os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts", "verify_test_points.py"),
+            [sys.executable, os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts", "verify_test_points.py"),
              self.tp_path, "--input-dir", self.input_dir, "--scope-list", self.scope_path],
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(tp_out.returncode, 0, tp_out.stdout + tp_out.stderr)
         tc_out = subprocess.run(
-            [sys.executable, os.path.join(ROOT, ".opencode", "skills", "test-case-spec", "scripts", "verify_test_cases.py"),
+            [sys.executable, os.path.join(ROOT, ".opencode", "skill", "test-case-spec", "scripts", "verify_test_cases.py"),
              self.tc_path, "--tp-file", self.tp_path, "--prd-dir", self.input_dir, "--scope-list", self.scope_path],
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(tc_out.returncode, 0, tc_out.stdout + tc_out.stderr)

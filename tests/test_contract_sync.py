@@ -14,7 +14,7 @@ import re
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SKILLS = os.path.join(ROOT, ".opencode", "skills")
+SKILLS = os.path.join(ROOT, ".opencode", "skill")
 
 
 def read(path):
@@ -106,9 +106,9 @@ class TestContractSync(unittest.TestCase):
             os.path.join(SKILLS, "test-case-spec", "SKILL.md"),
             os.path.join(SKILLS, "prd-record-spec", "SKILL.md"),
             os.path.join(SKILLS, "test-point-spec", "scripts", "check.py"),
-            os.path.join(ROOT, ".opencode", "agents", "test-manager.md"),
-            os.path.join(ROOT, ".opencode", "agents", "test-designer.md"),
-            os.path.join(ROOT, ".opencode", "agents", "test-qa-expert.md"),
+            os.path.join(ROOT, ".opencode", "agent", "test-manager.md"),
+            os.path.join(ROOT, ".opencode", "agent", "test-designer.md"),
+            os.path.join(ROOT, ".opencode", "agent", "test-qa-expert.md"),
             os.path.join(ROOT, "README.md"),
             os.path.join(ROOT, "AgentDesign.md"),
         ]
@@ -153,7 +153,7 @@ class TestContractSync(unittest.TestCase):
 
     # —— 派发单结构契约要点（2026-11-06 复盘收敛）——
     def test_dispatch_template_struct_contract_declared(self):
-        mgr = read(os.path.join(ROOT, ".opencode", "agents", "test-manager.md"))
+        mgr = read(os.path.join(ROOT, ".opencode", "agent", "test-manager.md"))
         self.assertIn("【结构契约要点", mgr, "派发单模板缺结构契约要点段")
         self.assertIn("第一个 `##` 章节之前的唯一表格", mgr)
         self.assertIn("基线对账归属", mgr, "test-manager 缺基线对账归属条款")
