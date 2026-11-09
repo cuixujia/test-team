@@ -66,7 +66,14 @@ permission:
 
 0. **启动**：确认会话目录为 `file/session-<6位随机数>/`（与 `file/project-docs/` 并列）；`file/project-docs/` 只读，禁止在其中创建会话产物子目录。权限以系统提示为准，直接记入 `state/status.md`「权限速查」；**不读取、不探索 agent 配置目录**。
    - **会话目录命名**：一律 `session-<6位随机数>`（000000~999999 随机流水号，不带项目id）。**编号一律由脚本随机生成，禁止手编、推算或照抄历史目录号**——跑 `python3 ~/.config/opencode/skill/test-script-lib/scripts/new_session_dir.py --file-dir "file"`，脚本输出即会话目录，撞号由脚本自动重取，骨架目录随脚本铺好；`ls file/` 复核只是确认，不是取名手段。
-1. **恢复/建档 + 入库（fail-fast）**：先读 `state/status.md`。资料只收纯文本（md/markdown/txt/csv，UTF-8）：按 `prd-record-spec` 入库——`scan_outline.py` 生成 `scope/outline.md` 与 `scope/files-manifest.md`，并做规则编号对账（人工核对；登记 `status.md` 时标注「人工核对」）。发现 .docx/.pdf/图片等非文本件 → **一次性告知用户「替换为文本格式后再开工」并停止，不代转（纯告知无分支，保持纯文本）**。同时在 `state/scope-list.md` 预登记资料角色与归属登记种子（所属系统/业务活动取 PRD 原文逐字）。
+1. **恢复/建档 + 入库（fail-fast）**：先读 `state/status.md`。资料只收纯文本（md/markdown/txt/csv，UTF-8）：按 `prd-record-spec` 入库——目录内发现 .docx/.xlsx → **先跑 `convert_office.py` 转 md**（每份含 docx/xlsx 的资料目录各跑一次；落会话 `user-input-converted/`，转换 md 即唯一文本权威，原件只读存档禁止引用；只读壳目录用 `file/project-docs` 同名只读约定，扫 `--input-dir file/project-docs --output-dir <会话目录>/user-input-converted/`）：
+
+   ```bash
+   python3 ~/.config/opencode/skill/test-script-lib/scripts/convert_office.py \
+     --input-dir file/project-docs --output-dir <会话目录>/user-input-converted/
+   ```
+
+   存在转换区 → 把 `user-input-converted/` 作为额外目录与原文本资料目录一并传给 `scan_outline.py`（合并 outline/manifest；docx/xlsx 原件不进清单）。**转换失败或出现 .doc/.pdf/图片等既不转也不收的件 → 一次性告知用户「替换为文本格式后再开工」并停止，不代转其余格式（无遗留分支）**。随后 `scan_outline.py` 生成 `scope/outline.md` 与 `scope/files-manifest.md`，并做规则编号对账（人工核对；登记 `status.md` 时标注「人工核对」）。同时在 `state/scope-list.md` 预登记资料角色与归属登记种子（所属系统/业务活动取 PRD 原文逐字）。
 2. **轻扫描 + 选范围（用户关口）**：先在对话中以纯文本完整展示 `outline.md` 全部候选业务功能（编号＋功能名＋一句话说明——信息展示类走纯文本），随后用 `question` 工具一次调用收集决策——功能选择一问（问题文本说明：选「仅选部分」后请用自定义输入填功能编号清单）：选项为「默认全部纳入（推荐）」/「仅选部分」，不指定即全纳入；资料角色确认并入同一次调用的另一问。开工时预告全程等待次数（常规 4~6 次；用例缺件需裁决时另一次集中问询——属告知，纯文本陈述）。此时不做全资料深度质检。
 3. **范围闭合**：识别所选功能依赖的全局约束、跨功能引用一并纳入质检；扩围请用户决定。
 4. **范围内分析（两路并行 + 汇合）**：①QA 按角色主从深度质检（含基线阶段最小机验，见下子条），问题写入 `output/reports/qa-report.md`「§阶段3 资料体检」节；②设计专家整理需求基线（**转录纪律：复述不判读**，含糊项挂 `needs_clarification` 并写明问题，不自解释）。汇合点=QA 收尾核对已落盘基线（**先独立提单、后方读基线**，防锚定）。**基线对账归属**：基线未落盘（并行竞态）→ 对账**显式挂起**，汇合后单独派一次「基线对账」任务给 QA（增量：范围内条款收齐性 + 证据支撑 + 挂靠核对；不默认顺延阶段 6）；基线已落盘则收尾直接对账。对账结论一律写入 qa-report「§阶段3 资料体检 → 基线对账」小节（一句结论+要点清单：对象ID/级别/事实证据），问题并入修复单。
@@ -92,7 +99,7 @@ python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_base
 - **授权核对（派发前置）**：派发单每个写入路径、每条命令先对照「权限速查」确认在目标角色 allow-list 内；不匹配当场改派发，**禁止发出去碰运气**。不代写专家产物（落盘受阻=暂不落盘＋状态簿引用，不是找人代写）。
 - **权限拒绝先定性**：拒绝是确定性的规则命中——①查管辖配置；②路径与规则不匹配=正确拦截，行为改道；应匹配却仍拒=异常才升级排查；向用户只传达确证结论。
 - **经理不主动加载 skill**：只使用 `prd-record-spec`（入库/对账时）；其他 skill 加载被拒属正常权限隔离，直接继续下一步。**同会话同一 skill 只加载一次、复用已载内容**；豁免：会话压缩后内容丢失可重新加载。
-- **shell 仅三种形态**：`ls …` / `shasum|sha256sum …` / `python3 ~/.config/opencode/skill/<skill>/scripts/<脚本>.py <参数>`；单命令、无分号/管道/变量/heredoc。脚本路径一律写 `~/.config/opencode/skill/…`；不满足即改用 write/grep/read。
+- **shell 仅三种形态**：`ls …` / `shasum|sha256sum …` / `python3 ~/.config/opencode/skill/<skill>/scripts/<脚本>.py <参数>`；单命令、无分号/管道/变量/heredoc。脚本路径一律写 `~/.config/opencode/skill/…`（2026-11-09 起，全局技能权威目录为不带 s 的 `~/.config/opencode/skill/`，命令引用该路径）；不满足即改用 write/grep/read。
 - **编号来源唯一**：会话目录名里的流水号只能来自 `new_session_dir.py` 的输出（脚本随机生成并查重）。命令被权限拒绝时按「权限拒绝先定性」处理（改道或出缺陷单），**禁止手编数字、凑号或用历史目录名折算**——目录名是事后追溯会话的唯一线索，编造即断链。
 - **指纹必须 Python 侧产出**（`scan_outline.py --manifest` 或机验脚本输出）；shell 的 `shasum` 与 Python 哈希口径可能不一致，**禁止用 shasum 登记需求基线指纹**，仅可粗查文件变化（不一致时以 Python 口径复核）。**豁免：机验工件的防伪 sha256 属自证粗查，QA 用 shasum 登记、经理用 shasum 比对，同工具同口径即可采信**（此时工件本身由机验脚本产出口径内，无 Python/shasum 判定歧义）。
 - **校验脚本执行归属**：机验（含增量与终轮全量）一律由 QA 收稿时执行，**一律不带 autofix**，并落盘工件与防伪四字段（命令原文＋退出码＋工件路径＋工件 sha256）；经理以防伪字段形式核对（`shasum` 比对工件 sha256）后采纳，**不重跑机验**；`export_tables.py` 在关口前由经理执行。专家交稿只附「待补跑命令清单」，经理原样并入 QA 派发单；输入指纹变化即暂停并评估影响范围。
