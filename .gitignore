@@ -3,3 +3,4 @@ __pycache__/
 *.py[cod]
 file/project-docs/prd-demo.md
 file/session-*/
+.idea

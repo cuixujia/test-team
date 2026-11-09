@@ -95,17 +95,20 @@ def main():
                 "若它来自辅资料且无基线需求可挂，在主表行内标注 `辅资料补充`（仅 WARN 不 FAIL）"
             )
 
-    # TC 关联字段支持逗号分隔的多个 TP；详细有效性也由 verify_test_cases.py 检查。
+    # 关联TP 必须单值（裁例通告裁决二：一 TC = 一 TP，"相关 TP"多挂靠已废止）；
+    # 引用有效性的主裁在 verify_test_cases.py，此处为端到端追溯关的同口径防线。
     if args.tc_file and len(tc_header or []) >= 3:
         for row in tc_rows:
             if len(row) < 3:
                 continue
-            refs = [x.strip() for x in re.split(r"[,，、]", row[2]) if x.strip()]
-            if not refs:
-                failures.append(f"{row[0]} 没有关联测试点")
-            for ref in refs:
-                if ref not in tp_ids:
-                    failures.append(f"{row[0]} 关联了不存在的测试点 {ref}")
+            ref = row[2].strip()
+            if not re.fullmatch(r"TP-\d{3}", ref):
+                failures.append(
+                    f"{row[0]} 关联TP 必须为单一 TP 编号（一 TC = 一 TP，禁止多挂靠）: {ref or '空'}"
+                )
+                continue
+            if ref not in tp_ids:
+                failures.append(f"{row[0]} 关联了不存在的测试点 {ref}")
     if args.tc_file and not tc_ids:
         failures.append("用例清单没有有效测试用例")
 

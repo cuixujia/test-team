@@ -5,9 +5,12 @@
   1. 编号格式 TC-NNN、唯一（允许空号）
   2. 必填字段非空（标题/关联TP/优先级/前置条件/测试数据/操作步骤/预期结果/用例类型/标签）
   3. 优先级取值 P0-P3
-  4. 关联TP 引用完整性（必须存在于测试点清单）
+  4. 关联TP 单值（一 TC = 一 TP，裁例通告裁决二；多值/分隔符一律 FAIL，不依赖 --tp-file）
+  4b. 关联TP 引用完整性（唯一 TP 必须存在于测试点清单）
   5. 覆盖对照表存在；已验收 TP 全覆盖，未覆盖须写明原因
+  5b. 每 TP 直属 TC ≥ 2（裁例通告裁决一；覆盖对照表已登记例外说明的 TP 交质检语义裁决）
   6. 标签列结构：含「所属业务功能」键；取值非空时须逐字命中 PRD；仅该键允许按规范留空（PRD 无功能矩阵项时）
+  6b. 标签取值逐字命中 PRD
   7. 交付物中不得出现业务功能编号
 
 用法：
@@ -45,8 +48,13 @@ def warn(m):
 
 
 def split_tp_refs(value):
-    """首项为主要 TP，后续项为相关 TP；兼容原有单 TP 格式。"""
-    return [item.strip() for item in re.split(r"[,，、]", value) if item.strip()]
+    """拆出 关联TP 列的所有 TP 项——仅用于单值违规诊断。
+
+    裁例通告裁决二（一 TC = 一 TP）后，本函数不再产出「主要 TP / 相关 TP」层级：
+    合法值只能拆出 1 项，多项即由校验 4 判 FAIL。分隔符放宽到空白与分号，
+    防止用空格或分号绕过单值约束。
+    """
+    return [item.strip() for item in re.split(r"[,，、;；\s]+", value or "") if item.strip()]
 
 
 def scope_list_prd_files(scope_text):
@@ -100,8 +108,9 @@ _PRD_EXTS = (".md", ".markdown", ".txt", ".csv")
 PRD_EXTS = _PRD_EXTS
 
 
-# parse_md_table / parse_first_table / norm / read_text / split_tp_refs 的唯一实现在
-# .opencode/skills/test-script-lib/scripts/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
+# parse_md_table / parse_first_table / norm / read_text 的唯一实现在
+# .opencode/skills/test-script-lib/scripts/mdtable.py（2026-11-05 收敛，禁止本地副本）；
+# split_tp_refs 是本文件本地的单值违规诊断工具（裁决二后不再解析「相关 TP」）。
 
 
 def load_prd_texts(prd_dirs):
@@ -204,28 +213,39 @@ def main():
     else:
         ok("优先级取值校验通过")
 
-    # 4) 关联TP 引用完整性
+    # 4) 关联TP 单值（一 TC = 一 TP，裁例通告裁决二）
+    #    与 --tp-file 无关：即使未给测试点清单，单值约束也必须生效。
     tps = set()
     if args.tp_file and os.path.isfile(args.tp_file):
         tt = read_text(args.tp_file)
         _h, trows = parse_first_table(tt)
         tps = {r[0] for r in trows if r and re.fullmatch(r"TP-\d{3}", r[0])}
     tc_tp_map = {}
+    multi_ref = []
+    for r in main_rows:
+        ref = r[2] if len(r) > 2 else ""
+        refs = split_tp_refs(ref)
+        tc_tp_map[r[0]] = set(refs)
+        if len(refs) != 1 or not re.fullmatch(r"TP-\d{3}", refs[0]):
+            multi_ref.append(f"{r[0]}→({ref.strip() or '空'})")
+    if multi_ref:
+        fail("关联TP 必须为单一 TP 编号（一 TC = 一 TP，禁止多挂靠）: "
+             + " ".join(multi_ref))
+    else:
+        ok("关联TP 单值校验通过（一 TC = 一 TP）")
+
+    # 4b) 关联TP 引用完整性（唯一 TP 必须存在于测试点清单）
     if tps:
-        badref = []
-        for r in main_rows:
-            ref = r[2] if len(r) > 2 else ""
-            refs = split_tp_refs(ref)
-            tc_tp_map[r[0]] = set(refs)
-            if not refs:
-                badref.append(f"{r[0]}→(缺少关联TP)")
-            for tp in refs:
-                if not re.fullmatch(r"TP-\d{3}", tp) or tp not in tps:
-                    badref.append(f"{r[0]}→{tp}")
+        badref = [
+            f"{r[0]}→{tp}"
+            for r in main_rows
+            for tp in tc_tp_map.get(r[0], ())
+            if tp not in tps
+        ]
         if badref:
-            fail(f"关联TP 格式错误或不存在于测试点清单: {' '.join(badref)}")
+            fail(f"关联TP 不存在于测试点清单: {' '.join(badref)}")
         else:
-            ok("主测试点及相关测试点引用完整性校验通过")
+            ok("关联TP 引用完整性校验通过")
     else:
         print("[WARN] 未提供 --tp-file 或测试点清单为空，跳过引用完整性校验")
 
@@ -280,6 +300,25 @@ def main():
             fail("测试点→用例对照表登记了用例中未声明的关联: " + " ".join(f"{tp}→{tc}" for tp, tc in extra_pairs))
         if not missing_pairs and not extra_pairs:
             ok("用例关联与测试点→用例对照表一致")
+
+        # 5b) 每 TP 直属 TC ≥ 2（裁例通告裁决一）
+        #     单值归属后，tc_tp_map 中每个 TP 的计数即其直属 TC 数；
+        #     覆盖对照表「未覆盖原因」列非空 = 已登记例外说明，交质检按维度数语义裁决。
+        if tps:
+            tc_per_tp = {}
+            for refs in tc_tp_map.values():
+                for tp in refs:
+                    tc_per_tp[tp] = tc_per_tp.get(tp, 0) + 1
+            thin = [
+                f"{tp}({tc_per_tp.get(tp, 0)}条)"
+                for tp in sorted(covered_tp & tps)
+                if tc_per_tp.get(tp, 0) < 2 and tp not in declared_exempt
+            ]
+            if thin:
+                fail("以下 TP 直属 TC 不足 2 条（每 TP ≥2）: " + " ".join(thin)
+                     + "；确属单维度承载的须在覆盖对照表「未覆盖原因」列登记例外说明交质检裁决")
+            else:
+                ok("每 TP 直属 TC ≥ 2 校验通过")
 
     # 6) 标签结构与取值
     #   规范（test-case-spec「标签规范」）：所属业务功能在 PRD 无对应功能矩阵项（如非功能约束）时允许留空；

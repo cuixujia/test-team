@@ -12,7 +12,9 @@
   - TC 视图表头：用例编号 | 标题 | 关联TP | 测试点验证意图 | 优先级 | 用例类型 |
     前置条件 | 测试数据 | 操作步骤 | 预期结果 | 所属系统 | 业务活动 | 业务功能 | 依据（主TP）
     归属取自主件「标签」列（所属系统/所属业务活动/所属业务功能 三键拆列）；
-    测试点验证意图=主 TP（关联TP 首个）；依据（主TP）= 该 TP 的依据指针。
+    关联TP 为单值（一 TC = 一 TP），测试点验证意图/依据均按该唯一 TP 回填；
+    列名「主TP」沿用历史视图契约，主TP 即关联TP 的唯一 TP，无「相关 TP」层级。
+    主件若出现多值：视图只输出首个并 WARN，机验 verify_test_cases.py 判 FAIL。
   - 自洽校验：视图行数与编号集合必须与主表一致，否则 exit 1。
 
 用法：
@@ -278,16 +280,21 @@ def export_tc(args):
         tc_ids.append(tc_id)
         linked = split_ids(r[idx["关联TP"]])
         primary = linked[0] if linked else ""
+        if len(linked) > 1:
+            WARNED.append(
+                f"{tc_id} 关联TP 含多个 TP（{r[idx['关联TP']]}）：视图只按首个回填，"
+                "主件须改为单一 TP（一 TC = 一 TP，机验 FAIL）"
+            )
         tags = _parse_tags(r[idx["标签"]])
         sys_c = tags.get("所属系统", "")
         act_c = tags.get("所属业务活动", "")
         feat_c = tags.get("所属业务功能", "")
         intent = tp2intent.get(primary, "")
         if primary and not intent:
-            WARNED.append(f"{tc_id} 主 TP {primary} 在测试点清单中不存在，验证意图留空")
+            WARNED.append(f"{tc_id} 关联TP {primary} 在测试点清单中不存在，验证意图留空")
         basis = tp2basis.get(primary, "") if primary else ""
         out_rows.append([
-            tc_id, r[idx["标题"]], r[idx["关联TP"]], intent, r[idx["优先级"]], r[idx["用例类型"]],
+            tc_id, r[idx["标题"]], primary, intent, r[idx["优先级"]], r[idx["用例类型"]],
             r[idx["前置条件"]], r[idx["测试数据"]], r[idx["操作步骤"]], r[idx["预期结果"]],
             sys_c, act_c, feat_c, basis,
         ])

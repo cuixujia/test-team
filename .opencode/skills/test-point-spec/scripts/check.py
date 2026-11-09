@@ -10,8 +10,8 @@
   3. requirements-baseline  基线结构/范围/证据/指纹校验（冻结场景附加 --freeze）
   4. test-points               TP 编号/列序/必填/覆盖表/标签泄漏（--phase tp/full）
   5. requirement-to-test-point 需求→TP 追溯（--phase tp/full）
-  6. test-cases                TC 结构/标签/覆盖对账（--phase tc/full）
-  7. end-to-end-traceability   需求→TP→TC 端到端追溯（--phase tc/full）
+  6. test-cases                TC 结构/标签/关联TP 单值/每 TP ≥2 TC/覆盖对账（--phase tc/full）
+  7. end-to-end-traceability   需求→TP→TC 端到端追溯（含关联TP 单值，--phase tc/full）
   8. report-freshness          内建：报告写入后自检（工具链指纹与产物指纹复核），
                                取代独立脚本 verify_validation_report.py
 
