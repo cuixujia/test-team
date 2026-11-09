@@ -15,7 +15,7 @@ permission:
   # bash：禁止 —— 仅例外：extract_excerpt.py（只读定位工具，摘录必须从其输出复制登记）；其余校验一律 QA 收稿时执行且不带 autofix
   bash:
     "*": deny
-    "python3 *opencode/skill/*/scripts/extract_excerpt.py *": allow
+    "python3 *opencode/skills/*/scripts/extract_excerpt.py *": allow
   # skill 按角色授权
   skill:
     "*": deny
@@ -59,7 +59,7 @@ permission:
 **基线增补（TC 阶段增量）**：经理按阶段 8 体检结论派发「基线增补」时，**只追加、不改旧行**：编号从现有 REQ 最大号续排，`feature_id` 落主受益/首个适用的选定功能；**首条证据必须是澄清证据** `{"clarification_id": "CL-xxx"}`（原文有原型可另加直引证据）；增补不解除冻结、不触碰已确认条目。交稿附「待补跑命令清单」（可直接复制的单命令，`<会话目录>` 占位符按派发单替换）：
 
 ```bash
-python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_baseline.py \
+python3 ~/.config/opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py \
   <会话目录>/scope/requirements-baseline.json \
   --input-dir file/project-docs \
   --clarifications <会话目录>/state/clarifications.md \
@@ -82,7 +82,7 @@ python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_base
 **机验管线**（命令由 **QA 收稿时执行**且**不带 autofix**；交稿时原样附入「待补跑命令清单」，不自行运行）：TP 阶段一条命令产出全部机验报告（引文、基线、结构、追溯、覆盖对照表自动推导），报告工件 `check-tp.json` + `.quotes-tp.json` + `.derived-coverage.md`；**增量口径**：质检修复轮 QA 经 `check.py --only <受影响步骤>` 只验受影响步骤；用户确认关口前的最后一次机验必须 `--phase` 全量（终轮兜底）：
 
 ```bash
-python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tp \
+python3 ~/.config/opencode/skills/test-point-spec/scripts/check.py --phase tp \
   --input-dir <资料目录> --baseline <需求基线.json> \
   --scope-list <任务功能清单> --tp-file <测试点清单> \
   --clarifications <澄清记录> --report <output/reports/check-tp.json>
@@ -95,7 +95,7 @@ python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tp \
 产物必须有 TP→TC 覆盖表。机器流水线（命令由 **QA 收稿时执行**，交稿附入「待补跑命令清单」）生成绑定文件指纹的 `check-tc.json`（**含 TC 清单引文逐字机验（quote-tc 步骤，现不带 autofix）与全链追溯**）：
 
 ```bash
-python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tc \
+python3 ~/.config/opencode/skills/test-point-spec/scripts/check.py --phase tc \
   --input-dir <资料目录> --baseline <需求基线.json> \
   --scope-list <任务功能清单> --tp-file <已确认测试点> --tc-file <测试用例清单> \
   --clarifications <澄清记录> --report <output/reports/check-tc.json>

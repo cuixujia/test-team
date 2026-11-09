@@ -101,7 +101,7 @@ PRD_EXTS = _PRD_EXTS
 
 
 # parse_md_table / parse_first_table / norm / read_text / split_tp_refs 的唯一实现在
-# .opencode/skill/test-script-lib/scripts/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
+# .opencode/skills/test-script-lib/scripts/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
 
 
 def load_prd_texts(prd_dirs):

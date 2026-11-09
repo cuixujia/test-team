@@ -9,7 +9,7 @@ description: 测试团队唯一权威知识库——四份原文（方法论/维
 
 ## 一、知识清单
 
-路径锚点：附属知识件位于 `~/.config/opencode/skill/test-knowledge/references/`。前四份为**原文只读件**，一字不改：
+路径锚点：附属知识件位于 `~/.config/opencode/skills/test-knowledge/references/`。前四份为**原文只读件**，一字不改：
 
 | 文件 | 解决什么问题 | 关键章节 |
 |---|---|---|

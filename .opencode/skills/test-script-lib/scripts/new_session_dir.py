@@ -9,7 +9,7 @@
 或凑号——手编数字会让目录名失去唯一性，同目录名互相覆盖、追溯断链。
 
 用法（仓库根目录起，相对路径单命令）：
-  python3 .opencode/skill/test-script-lib/scripts/new_session_dir.py \
+  python3 .opencode/skills/test-script-lib/scripts/new_session_dir.py \
     --file-dir "file"
 
   --file-dir    工作空间下的 file 目录（支持字面路径或通配模式，模式由脚本自行展开）

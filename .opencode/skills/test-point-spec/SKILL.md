@@ -115,7 +115,7 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 - 校验统一入口：`check.py --phase tp|full`。
 <!-- CONTRACT-END: test-point-spec -->
 
-> 表格解析的唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skill/…`）；`scripts/verify_test_points.py` 从其导入，本地副本违规。
+> 表格解析的唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skills/…`）；`scripts/verify_test_points.py` 从其导入，本地副本违规。
 
 ## 派生数据视图（test-point-table.md，只读投影）
 
@@ -128,7 +128,7 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 - 主件变更即视图失效：机验 PASS 后经理重跑 `export_tables.py` 刷新，无人工同步步骤。
 
 ```bash
-python3 ~/.config/opencode/skill/test-point-spec/scripts/export_tables.py --phase tp \
+python3 ~/.config/opencode/skills/test-point-spec/scripts/export_tables.py --phase tp \
   --tp-file <test-point.md> --baseline <requirements-baseline.json> \
   --scope-list <scope-list.md> --output <test-point-table.md>
 ```

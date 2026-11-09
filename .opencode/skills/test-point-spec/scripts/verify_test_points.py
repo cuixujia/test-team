@@ -55,7 +55,7 @@ def warn(m):
 
 
 # parse_md_table / parse_first_table / norm / read_text / sha256_of 已收敛至
-# .opencode/skill/test-script-lib/scripts/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
+# .opencode/skills/test-script-lib/scripts/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
 
 
 # 直引证据（文件:行号+原话，唯一 PRD 证据格式，见 prd-record-spec/SKILL.md）

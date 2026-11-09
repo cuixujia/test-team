@@ -16,7 +16,7 @@
                                取代独立脚本 verify_validation_report.py
 
 典型用法：
-  python3 .opencode/skill/test-point-spec/scripts/check.py --phase full \
+  python3 .opencode/skills/test-point-spec/scripts/check.py --phase full \
     --input-dir <资料目录> --baseline <requirements-baseline.json> \
     --scope-list <state/scope-list.md> --tp-file <test-point.md> --tc-file <test-case.md> \
     --clarifications <state/clarifications.md> --report <output/reports/check-full.json>

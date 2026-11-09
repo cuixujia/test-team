@@ -11,7 +11,7 @@
   由人工按主从裁决与直引证据认定，不在本工具免责范围之外另设判定。
 
 用法（经理侧，shell 单命令形态）：
-  python3 .opencode/skill/test-script-lib/scripts/screen_intent_words.py \
+  python3 .opencode/skills/test-script-lib/scripts/screen_intent_words.py \
     --tp-file <测试点清单.md> [--report <输出的json路径>]
 """
 import argparse

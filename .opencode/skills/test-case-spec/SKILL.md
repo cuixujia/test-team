@@ -91,7 +91,7 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 校验统一入口：`check.py --phase tc|full`。
 <!-- CONTRACT-END: test-case-spec -->
 
-> 表格解析唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skill/…`）；`scripts/verify_test_cases.py` 从其导入。
+> 表格解析唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skills/…`）；`scripts/verify_test_cases.py` 从其导入。
 
 ## 派生数据视图（test-case-table.md，只读投影）
 
@@ -108,7 +108,7 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 主件变更即视图失效：机验 PASS 后重跑 `export_tables.py` 刷新。
 
 ```bash
-python3 ~/.config/opencode/skill/test-point-spec/scripts/export_tables.py --phase tc \
+python3 ~/.config/opencode/skills/test-point-spec/scripts/export_tables.py --phase tc \
   --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
 ```
 

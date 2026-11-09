@@ -14,7 +14,7 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
    发现 .docx/.xlsx → 经理在轻扫描**之前**先跑一次 `convert_office.py`（每份含 doc/xlsx 的资料目录各跑一次，秒级一次性）：
 
    ```bash
-   python3 ~/.config/opencode/skill/test-script-lib/scripts/convert_office.py \
+   python3 ~/.config/opencode/skills/test-script-lib/scripts/convert_office.py \
      --input-dir <含docx/xlsx的资料目录> --output-dir <会话目录>/user-input-converted/
    ```
 
@@ -27,7 +27,7 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；指纹段落同步登记 `state/status.md`）：
 
    ```bash
-   python3 ~/.config/opencode/skill/prd-record-spec/scripts/scan_outline.py \
+   python3 ~/.config/opencode/skills/prd-record-spec/scripts/scan_outline.py \
      --input-dir <资料目录> [<资料目录> ...] --output <会话目录>/scope/outline.md \
      --manifest <会话目录>/scope/files-manifest.md
    ```
@@ -79,7 +79,7 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 ## 四、机验（零语义，脚本执行）
 
 ```bash
-python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_quotes.py \
+python3 ~/.config/opencode/skills/prd-record-spec/scripts/verify_quotes.py \
   <引用表.md 或 .json> --input-dir <资料目录> [<资料目录> ...] --context --report <引文报告.json>
 ```
 

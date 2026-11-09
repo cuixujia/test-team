@@ -13,7 +13,7 @@ permission:
   # bash：机验自执行＋防伪自证——仅库脚本与 shasum
   bash:
     "*": deny
-    "python3 *opencode/skill/*/scripts/*.py *": allow
+    "python3 *opencode/skills/*/scripts/*.py *": allow
     "shasum *": allow
   # skill 按角色授权
   skill:

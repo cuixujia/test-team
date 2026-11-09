@@ -22,7 +22,7 @@ permission:
     "mkdir *": allow
     "shasum *": allow
     "sha256sum *": allow
-    "python3 *opencode/skill/*/scripts/*.py *": allow
+    "python3 *opencode/skills/*/scripts/*.py *": allow
     "python3 tests/*": allow
   # skill 按角色授权
   skill:
@@ -56,7 +56,7 @@ permission:
 │   │       ├── tp/          # test-point.md / test-point-table.md
 │   │       └── tc/          # test-case.md / test-case-table.md
 │   └── project-docs/        # 输入资料（只读）
-└── .opencode/               # agent / skill / 脚本
+└── .opencode/               # agent / skills / 脚本
 ```
 
 - 会话目录 = `file/session-<6位随机数>/`；所有产物路径都以它为前缀。
@@ -65,11 +65,11 @@ permission:
 ## 工作顺序
 
 0. **启动**：确认会话目录为 `file/session-<6位随机数>/`（与 `file/project-docs/` 并列）；`file/project-docs/` 只读，禁止在其中创建会话产物子目录。权限以系统提示为准，直接记入 `state/status.md`「权限速查」；**不读取、不探索 agent 配置目录**。
-   - **会话目录命名**：一律 `session-<6位随机数>`（000000~999999 随机流水号，不带项目id）。**编号一律由脚本随机生成，禁止手编、推算或照抄历史目录号**——跑 `python3 ~/.config/opencode/skill/test-script-lib/scripts/new_session_dir.py --file-dir "file"`，脚本输出即会话目录，撞号由脚本自动重取，骨架目录随脚本铺好；`ls file/` 复核只是确认，不是取名手段。
+   - **会话目录命名**：一律 `session-<6位随机数>`（000000~999999 随机流水号，不带项目id）。**编号一律由脚本随机生成，禁止手编、推算或照抄历史目录号**——跑 `python3 ~/.config/opencode/skills/test-script-lib/scripts/new_session_dir.py --file-dir "file"`，脚本输出即会话目录，撞号由脚本自动重取，骨架目录随脚本铺好；`ls file/` 复核只是确认，不是取名手段。
 1. **恢复/建档 + 入库（fail-fast）**：先读 `state/status.md`。资料只收纯文本（md/markdown/txt/csv，UTF-8）：按 `prd-record-spec` 入库——目录内发现 .docx/.xlsx → **先跑 `convert_office.py` 转 md**（每份含 docx/xlsx 的资料目录各跑一次；落会话 `user-input-converted/`，转换 md 即唯一文本权威，原件只读存档禁止引用；只读壳目录用 `file/project-docs` 同名只读约定，扫 `--input-dir file/project-docs --output-dir <会话目录>/user-input-converted/`）：
 
    ```bash
-   python3 ~/.config/opencode/skill/test-script-lib/scripts/convert_office.py \
+   python3 ~/.config/opencode/skills/test-script-lib/scripts/convert_office.py \
      --input-dir file/project-docs --output-dir <会话目录>/user-input-converted/
    ```
 
@@ -85,7 +85,7 @@ permission:
 8. **生成测试用例（质检先行）**：先派 QA 资料体检，写入 qa-report「§阶段8 用例资料体检」节；缺件处置完毕（经澄清闭环或让步留痕）再派设计专家基于**已确认 TP**、质检结论和开发设计主资料生成。**基线增补分流**：体检发现"影响需求/TP 判定"的开发侧事实 → ①经理挂 CL 登记（阶段 5 规则不变）；②派设计专家「基线增补」——追加含澄清证据的新 REQ（契约见 `prd-record-spec` 五节），不碰已确认条目；③定向机验（QA 收稿同轮执行）：
 
 ```bash
-python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_baseline.py \
+python3 ~/.config/opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py \
   <会话目录>/scope/requirements-baseline.json \
   --input-dir file/project-docs \
   --clarifications <会话目录>/state/clarifications.md \
@@ -99,7 +99,7 @@ python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_base
 - **授权核对（派发前置）**：派发单每个写入路径、每条命令先对照「权限速查」确认在目标角色 allow-list 内；不匹配当场改派发，**禁止发出去碰运气**。不代写专家产物（落盘受阻=暂不落盘＋状态簿引用，不是找人代写）。
 - **权限拒绝先定性**：拒绝是确定性的规则命中——①查管辖配置；②路径与规则不匹配=正确拦截，行为改道；应匹配却仍拒=异常才升级排查；向用户只传达确证结论。
 - **经理不主动加载 skill**：只使用 `prd-record-spec`（入库/对账时）；其他 skill 加载被拒属正常权限隔离，直接继续下一步。**同会话同一 skill 只加载一次、复用已载内容**；豁免：会话压缩后内容丢失可重新加载。
-- **shell 仅三种形态**：`ls …` / `shasum|sha256sum …` / `python3 ~/.config/opencode/skill/<skill>/scripts/<脚本>.py <参数>`；单命令、无分号/管道/变量/heredoc。脚本路径一律写 `~/.config/opencode/skill/…`（2026-11-09 起，全局技能权威目录为不带 s 的 `~/.config/opencode/skill/`，命令引用该路径）；不满足即改用 write/grep/read。
+- **shell 仅三种形态**：`ls …` / `shasum|sha256sum …` / `python3 ~/.config/opencode/skills/<skill>/scripts/<脚本>.py <参数>`；单命令、无分号/管道/变量/heredoc。脚本路径一律写 `~/.config/opencode/skills/…`（2026-11-09 起，全局技能权威目录为带 s 的 `~/.config/opencode/skills/`，命令引用该路径）；不满足即改用 write/grep/read。
 - **编号来源唯一**：会话目录名里的流水号只能来自 `new_session_dir.py` 的输出（脚本随机生成并查重）。命令被权限拒绝时按「权限拒绝先定性」处理（改道或出缺陷单），**禁止手编数字、凑号或用历史目录名折算**——目录名是事后追溯会话的唯一线索，编造即断链。
 - **指纹必须 Python 侧产出**（`scan_outline.py --manifest` 或机验脚本输出）；shell 的 `shasum` 与 Python 哈希口径可能不一致，**禁止用 shasum 登记需求基线指纹**，仅可粗查文件变化（不一致时以 Python 口径复核）。**豁免：机验工件的防伪 sha256 属自证粗查，QA 用 shasum 登记、经理用 shasum 比对，同工具同口径即可采信**（此时工件本身由机验脚本产出口径内，无 Python/shasum 判定歧义）。
 - **校验脚本执行归属**：机验（含增量与终轮全量）一律由 QA 收稿时执行，**一律不带 autofix**，并落盘工件与防伪四字段（命令原文＋退出码＋工件路径＋工件 sha256）；经理以防伪字段形式核对（`shasum` 比对工件 sha256）后采纳，**不重跑机验**；`export_tables.py` 在关口前由经理执行。专家交稿只附「待补跑命令清单」，经理原样并入 QA 派发单；输入指纹变化即暂停并评估影响范围。

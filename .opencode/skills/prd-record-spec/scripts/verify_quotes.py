@@ -19,7 +19,7 @@ r"""verify_quotes.py — 引文逐字机验（溯源规范 V2：文件:行号 �
 行号写法：`596`（单行）或 `596-598`（行区间，摘录须在区间连接文本中命中）。
 
 用法：
-  python3 .opencode/skill/prd-record-spec/scripts/verify_quotes.py <引用表> --input-dir <资料目录>
+  python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py <引用表> --input-dir <资料目录>
   加 --context 可在输出中打印每条引用的上下文行（供质检抽查断章风险）。
   加 --extract-from 可直接从 TP/TC 等清单文件抽取引用（语法 `文件名:L行号或区间「摘录」`），
   免于单独维护引用表——单一来源是清单文件本身。

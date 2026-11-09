@@ -66,9 +66,9 @@
 
 **待裁决登记**（当前无未决项；此后知识与 skills 再现口径分歧，新增一行"待裁决 Pn"，定义触发场景与降级行为，质检/生成端不得先行预判）。
 
-**口径同步名单**（本文件修订/新增裁决后，须逐一核对无旧口径残留）：`agent/test-designer.md`、`agent/test-qa-expert.md`、`skill/test-point-spec/SKILL.md`、`skill/test-case-spec/SKILL.md`、`skill/test-analysis-methods/SKILL.md`。
+**口径同步名单**（本文件修订/新增裁决后，须逐一核对无旧口径残留）：`agent/test-designer.md`、`agent/test-qa-expert.md`、`skills/test-point-spec/SKILL.md`、`skills/test-case-spec/SKILL.md`、`skills/test-analysis-methods/SKILL.md`。
 
 **已知缺口登记**：
 
 - `verify_test_cases.py` 的关联TP 解析仍按"首项为主、后续项相关"兼容多值格式（裁决二后机器未收紧为单值校验）——多挂靠回潮无机性防线，机险词表/校验收紧走缺陷单流程。
-- **口袋词表 WARN 预筛已落地**（2026-11-08 缺陷单流程：经理出单→维护者补丁→最小重放复验→单测固化）：`python3 ~/.config/opencode/skill/test-script-lib/scripts/screen_intent_words.py --tp-file <TP主件>`（shell 单命令形态，可加 `--report <json>` 存工件）。特性：只扫主表（第一个 `##` 之前的唯一表格）、WARN 不 FAIL（退出码恒 0）、PRD 原词照抄例外标注"人工判定"；最小重放已在 demo 主件（22 行/13 WARN，与人工判定的 A 类问题一一对应）复验。语义裁决仍归质检专家；词表修订以本文件§二为准，脚本不改词。
+- **口袋词表 WARN 预筛已落地**（2026-11-08 缺陷单流程：经理出单→维护者补丁→最小重放复验→单测固化）：`python3 ~/.config/opencode/skills/test-script-lib/scripts/screen_intent_words.py --tp-file <TP主件>`（shell 单命令形态，可加 `--report <json>` 存工件）。特性：只扫主表（第一个 `##` 之前的唯一表格）、WARN 不 FAIL（退出码恒 0）、PRD 原词照抄例外标注"人工判定"；最小重放已在 demo 主件（22 行/13 WARN，与人工判定的 A 类问题一一对应）复验。语义裁决仍归质检专家；词表修订以本文件§二为准，脚本不改词。

@@ -10,7 +10,7 @@
 非文本件提示用户替换为文本格式后方可入库，流程自动 fail-fast，无遗留分支。
 
 用法（仓库根目录起，相对路径单命令）：
-  python3 .opencode/skill/prd-record-spec/scripts/scan_outline.py --input-dir <资料目录>
+  python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir <资料目录>
   可加 --output <路径> 落盘。
 
 退出码：0 = 扫描成功；1 = 扫描部分失败（无法解析的文件）；2 = 用法错误
