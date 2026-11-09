@@ -89,7 +89,11 @@ def main():
                 f"辅资料补充验证点（豁免需求关联，留痕采信）: {' '.join(aux_uncovered)}"
             )
         for tp_id in fail_uncovered:
-            failures.append(f"测试点 {tp_id} 未关联到任何需求基线条目")
+            failures.append(
+                f"测试点 {tp_id} 未关联到任何需求基线条目。"
+                "请在「需求→测试点覆盖表」章节登记该 TP；"
+                "若它来自辅资料且无基线需求可挂，在主表行内标注 `辅资料补充`（仅 WARN 不 FAIL）"
+            )
 
     # TC 关联字段支持逗号分隔的多个 TP；详细有效性也由 verify_test_cases.py 检查。
     if args.tc_file and len(tc_header or []) >= 3:

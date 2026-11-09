@@ -177,7 +177,8 @@ class WorkflowToolsTest(unittest.TestCase):
                 )
             result = run(os.path.join(TPS, "verify_test_points.py"), tp, "--input-dir", directory, "--scope-list", scope)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("未以", result.stdout)
+            # 报错文案已改为指向真因：依据证据项解析失败（摘录被截断或缺右引号）
+            self.assertIn("依据证据项解析失败", result.stdout)
 
     def test_traceability_accepts_multiple_tps_per_case(self):
         with tempfile.TemporaryDirectory() as directory:

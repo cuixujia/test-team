@@ -270,12 +270,14 @@ def main():
     cache = {}
     index = index_input_files(args.input_dir)
     passed = failed = auto_fixed = 0
+    artifact_changed = False
     _report_failures = []
     _auto_fixes = []
     _resolved = []
 
     def try_writeback(path, old, new):
         """把回填后的摘录原位写回产物（仅当：旧摘录在文件中唯一且产物不在资料目录下）。"""
+        nonlocal artifact_changed
         note = ""
         try:
             path_a, input_a = os.path.abspath(path), os.path.abspath(args.input_dir)
@@ -291,6 +293,7 @@ def main():
                 with open(path, "w", encoding="utf-8") as stream:
                     stream.write(content.replace(old, new))
                 note = "written"
+                artifact_changed = True
         except OSError as exc:
             note = f"skip: 回写失败 ({exc})"
         return note
@@ -368,12 +371,28 @@ def main():
             failed += 1
 
     print(f"========== 结论: PASS={passed} FAIL={failed} 自愈={auto_fixed} 总={passed + failed} ==========")
+
+    # 自愈回写会改动被检产物 → 指纹前后不一致，必须透明可见（否则报告指纹与磁盘对不上，
+    # 下游会误判"机验后主件被改动"）。产物已变更时提示重跑全量。
+    source_digest_after = source_digest
+    if artifact_changed:
+        try:
+            source_digest_after = hashlib.sha256(open(args.quotes, "rb").read()).hexdigest()
+        except OSError:
+            source_digest_after = None
+        print(
+            f"[产物已变更] 自愈回写了 {os.path.abspath(args.quotes)}，"
+            f"主件指纹已变化（{source_digest} → {source_digest_after}），需重跑全量机验"
+        )
+
     if args.report:
         report = {
             "schema_version": 1,
             "kind": "quote-verification",
             "source": os.path.abspath(args.quotes),
             "source_sha256": source_digest,
+            "source_sha256_after": source_digest_after,
+            "artifact_changed": artifact_changed,
             "input_dir": os.path.abspath(args.input_dir),
             "extract_from": bool(args.extract_from),
             "autofix": bool(args.autofix),

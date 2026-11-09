@@ -109,6 +109,18 @@ def main():
     if header != ["编号", "验证意图", "类型", "分析方法", "依据（文件:行号+原话）"]:
         print(f"[FAIL] 测试点清单列序不符合契约: {header}")
 
+    # 表格结构自检：数据行单元格数 ≠ 表头列数 → 该行可能被摘录里的裸管道符撑开
+    # （裸 `|` 会把依据单元格从中间切断，依据 token 随之解析不到）。
+    # 只报 WARN 不 FAIL：列数不一致也可能由作者漏列造成，真判定仍由下方依据 token 校验承担。
+    if header:
+        expected_cols = len(header)
+        for idx, row in enumerate(main_rows, 1):
+            if len(row) != expected_cols:
+                warn(
+                    f"主表第 {idx} 行单元格数 {len(row)} ≠ 表头列数 {expected_cols}，"
+                    f"疑似摘录含未转义的 `|`（该行依据可能已被截断）: {row[0] if row else ''}"
+                )
+
     # 1) 编号格式 / 唯一（允许空号）
     ids = [r[0] for r in main_rows]
     bad_fmt = [i for i in ids if not re.fullmatch(r"TP-\d{3}", i)]
@@ -166,7 +178,12 @@ def main():
         for segment in segments:
             tok, cite = evidence_anchor(segment)
             if tok is None:
-                fail(f"依据证据项未以 直引(文件:L行「原话」) 或 CL-xxx 开头: {r[0]} ({segment[:30]})")
+                # 典型成因：摘录里含未转义的 `|`，把本单元格从中间切断，token 匹配不到
+                fail(
+                    f"依据证据项解析失败: {r[0]} — 摘录被截断或缺右引号「」。"
+                    f"常见原因：摘录含未转义的 `|` 切断了本单元格"
+                    f"（表格行原文的管道符必须写成 `\\|`）。片段: {segment[:60]}"
+                )
                 continue
             if tok.startswith("CL-"):
                 used_cl.add(tok)
