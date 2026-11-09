@@ -201,45 +201,63 @@ def lookup(path, files_cache):
     return files_cache[path]
 
 
-def index_input_files(input_dir):
-    """资料目录下的实际文件清单（相对路径，posix 分隔）——文件名消歧的候选集。"""
+def index_input_files(input_dirs):
+    """资料目录下的实际文件清单——文件名消歧的候选集。
+
+    input_dirs 可传多个（资料目录 + 会话内转换区），逐目录 walk 合并，
+    返回 [(rel, 该目录)]；同一 rel 在多个目录重复时由 resolve_file 判歧义。
+    """
     files = []
-    for root, _dirs, names in os.walk(input_dir):
-        for name in names:
-            rel = os.path.relpath(os.path.join(root, name), input_dir)
-            files.append(rel.replace(os.sep, "/"))
+    for input_dir in input_dirs:
+        for root, _dirs, names in os.walk(input_dir):
+            for name in names:
+                rel = os.path.relpath(os.path.join(root, name), input_dir)
+                files.append((rel.replace(os.sep, "/"), input_dir))
     return files
 
 
-def resolve_file(token, input_dir, index):
-    """把引用里的文件 token 解析为资料目录下的真实文件。
+def resolve_file(token, input_dirs, index):
+    """把引用里的文件 token 解析为资料目录下的真实文件（多目录版）。
 
-    散文前缀与文件名黏连（如「对应需求平台前端设计文档.md」）会让 token 带上前缀汉字，
-    此处按「token 以某个真实文件名为后缀」消歧：取最长命中名，唯一命中才放行；
-    同名多份（不同目录）视为歧义交人裁决，无命中视为资料文件不存在。
-    返回 (真实相对路径 | None, 说明)。
+    解析顺序：① token 在任一目录下精确命中登记 rel（唯一 → 放行）；
+    ② 散文前缀黏连按「token 以某登记文件名为后缀」消歧——取最长命中名，唯一才放行；
+    ③ 同 rel 跨目录重复、或候选多条 → 歧义交人裁决；无命中 → 文件不存在。
+    返回 (rel | None, 命中目录 | None, 说明)。
     """
-    if os.path.isfile(os.path.join(input_dir, token)):
-        return token, ""
+    exact = [(rel, d) for rel, d in index if rel == token]
+    if len(exact) == 1:
+        return exact[0][0], exact[0][1], ""
+    if len(exact) > 1:
+        return None, None, f"登记 rel 跨目录同名歧义: {token} → {sorted(d for _r, d in exact)}"
     token_base = token.replace("\\", "/").rsplit("/", 1)[-1]
     by_base = {}
-    for rel in index:
+    for rel, d in index:
         base = rel.rsplit("/", 1)[-1]
         if base and token_base.endswith(base):
-            by_base.setdefault(base, []).append(rel)
+            by_base.setdefault((base, d), []).append((rel, d))
     if not by_base:
-        return None, f"资料文件不存在: {token}"
-    longest = max(len(base) for base in by_base)
-    candidates = [rel for base, rels in by_base.items() if len(base) == longest for rel in rels]
+        return None, None, f"资料文件不存在: {token}"
+    longest = max(len(base) for base, _d in by_base)
+    candidates = [cand for (base, _d), rels in by_base.items()
+                  if len(base) == longest for cand in rels]
     if len(candidates) > 1:
-        return None, f"文件名消歧不唯一: {token} → {' / '.join(sorted(candidates))}"
-    return candidates[0], "散文前缀黏连，已按资料目录实际文件解析"
+        return None, None, f"文件名消歧不唯一: {token} → {' / '.join(f'{d}/{r}' for r, d in sorted(candidates))}"
+    rel, d = candidates[0]
+    return rel, d, "散文前缀黏连，已按资料目录实际文件解析"
+
+
+def locate(index, rel, input_dir):
+    """按 resolve 出的 (rel, 目录) 取绝对路径（未命中目录时回落首个资料目录）。"""
+    for registered, d in index:
+        if registered == rel and (d == input_dir or input_dir is None):
+            return os.path.join(d, registered)
+    return os.path.join(input_dir, rel) if input_dir else None
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("quotes", help="引用表（JSON 数组或 Markdown 管道表）或清单文件（配合 --extract-from）")
-    parser.add_argument("--input-dir", required=True, help="资料目录（引用表中的文件相对此目录）")
+    parser.add_argument("--input-dir", required=True, nargs="+", help="资料目录（可传多个：文本资料目录 + 会话转换区，合并 解析/直引）")
     parser.add_argument("--context", action="store_true", help="输出每条引用的上下文行")
     parser.add_argument("--extract-from", action="store_true", help="从清单文件按 引用语法 直抽取引，不读表格/JSON")
     parser.add_argument("--autofix", action="store_true", help="摘录自愈：行号正确且骨架命中时，回读原文回填摘录（源文件为产物且旧摘录唯一时原位回写），留痕由报告工件承载")
@@ -249,8 +267,8 @@ def main():
     if not os.path.isfile(args.quotes):
         print(f"用法错误: 引用表不存在 {args.quotes}", file=sys.stderr)
         return 2
-    if not os.path.isdir(args.input_dir):
-        print(f"用法错误: 资料目录不存在 {args.input_dir}", file=sys.stderr)
+    if not os.path.isdir(args.input_dir[0]):
+        print(f"用法错误: 资料目录不存在 {args.input_dir[0]}", file=sys.stderr)
         return 2
     source_digest = None
     try:
@@ -275,11 +293,11 @@ def main():
     _resolved = []
 
     def try_writeback(path, old, new):
-        """把回填后的摘录原位写回产物（仅当：旧摘录在文件中唯一且产物不在资料目录下）。"""
+        """把回填后的摘录原位写回产物（仅当：旧摘录在文件中唯一且产物不在任一资料目录下）。"""
         note = ""
         try:
-            path_a, input_a = os.path.abspath(path), os.path.abspath(args.input_dir)
-            if path_a.startswith(input_a + os.sep):
+            path_a = os.path.abspath(path)
+            if any(path_a.startswith(os.path.abspath(d) + os.sep) for d in args.input_dir):
                 note = "skip: 源文件位于资料目录（原资料禁止修改）"
                 return note
             with open(path_a, encoding="utf-8-sig") as stream:
@@ -297,7 +315,7 @@ def main():
 
     for q in quotes:
         rel_raw = q["file"]
-        rel, resolve_note = resolve_file(rel_raw, args.input_dir, index)
+        rel, hit_dir, resolve_note = resolve_file(rel_raw, args.input_dir, index)
         if rel is None:
             print(f"FAIL 引用#{q['seq']} {rel_raw}:{q['lines']} — {resolve_note}")
             _report_failures.append({"seq": q["seq"], "file": rel_raw, "lines": q["lines"], "quote": q["quote"], "error": resolve_note})
@@ -306,20 +324,20 @@ def main():
         if resolve_note:
             print(f"[RESOLVED] 引用#{q['seq']} {rel_raw} → {rel}（{resolve_note}）")
             _resolved.append({"seq": q["seq"], "raw": rel_raw, "resolved": rel})
+        source_path = os.path.join(hit_dir, rel)
         try:
             line_no = int(re.sub(r"\D", "", q["lines"][:8]) or 0)
         except ValueError:
             line_no = 0
         context = ""
         if line_no:
-            candidate = os.path.join(args.input_dir, rel)
-            if os.path.isfile(candidate):
-                lines = lookup(candidate, cache)
+            if os.path.isfile(source_path):
+                lines = lookup(source_path, cache)
                 lo, hi = max(1, line_no - 1), min(len(lines), line_no + 1)
                 context = " ⏐ ".join(ln for ln in lines[lo - 1:hi])
 
         try:
-            lines = lookup(os.path.join(args.input_dir, rel), cache)
+            lines = lookup(source_path, cache)
             start, end = resolve_lines(q["lines"], len(lines))
             if start == end and args.context is not None and context:
                 lo, hi = max(1, start - 1), min(len(lines), start + 1)
@@ -374,7 +392,8 @@ def main():
             "kind": "quote-verification",
             "source": os.path.abspath(args.quotes),
             "source_sha256": source_digest,
-            "input_dir": os.path.abspath(args.input_dir),
+            "input_dir": os.path.abspath(args.input_dir[0]),
+            "input_dirs": [os.path.abspath(d) for d in args.input_dir],
             "extract_from": bool(args.extract_from),
             "autofix": bool(args.autofix),
             "total": passed + failed,

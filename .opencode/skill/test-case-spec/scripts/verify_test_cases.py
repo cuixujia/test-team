@@ -104,41 +104,45 @@ PRD_EXTS = _PRD_EXTS
 # .opencode/skill/test-script-lib/scripts/mdtable.py 与上方定义（2026-11-05 收敛，禁止本地副本）
 
 
-def load_prd_texts(prd_dir):
-    """返回 (全部文件规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。"""
+def load_prd_texts(prd_dirs):
+    """返回 (全部文件规范化拼接文本, 跳过文件列表)。只读，不做任何格式转换落盘。
+
+    prd_dirs 可传多个（资料目录列表），逐目录 walk 合并。"""
     blob, skipped = [], []
-    for root, _dirs, files in os.walk(prd_dir):
-        for fn in sorted(files):
-            if fn.startswith("."):
-                continue
-            if not fn.lower().endswith(PRD_EXTS):
-                skipped.append(fn)
-                continue
-            path = os.path.join(root, fn)
-            try:
-                t = read_text(path)
-            except Exception:
-                skipped.append(fn)
-                continue
-            blob.append(norm(t))
+    for prd_dir in prd_dirs:
+        for root, _dirs, files in os.walk(prd_dir):
+            for fn in sorted(files):
+                if fn.startswith("."):
+                    continue
+                if not fn.lower().endswith(PRD_EXTS):
+                    skipped.append(fn)
+                    continue
+                path = os.path.join(root, fn)
+                try:
+                    t = read_text(path)
+                except Exception:
+                    skipped.append(fn)
+                    continue
+                blob.append(norm(t))
     return "".join(blob), skipped
 
 
-def load_file_texts(prd_dir):
+def load_file_texts(prd_dirs):
     """按文件名建立 {basename: 规范化文本} 映射（供标签命中精确到指定 PRD 文件）。"""
     files = {}
-    for root, _dirs, fnames in os.walk(prd_dir):
-        for fn in sorted(fnames):
-            if fn.startswith("."):
-                continue
-            if not fn.lower().endswith(PRD_EXTS):
-                continue
-            path = os.path.join(root, fn)
-            try:
-                t = read_text(path)
-            except Exception:
-                continue
-            files[fn] = norm(t)
+    for prd_dir in prd_dirs:
+        for root, _dirs, fnames in os.walk(prd_dir):
+            for fn in sorted(fnames):
+                if fn.startswith("."):
+                    continue
+                if not fn.lower().endswith(PRD_EXTS):
+                    continue
+                path = os.path.join(root, fn)
+                try:
+                    t = read_text(path)
+                except Exception:
+                    continue
+                files[fn] = norm(t)
     return files
 
 
@@ -146,7 +150,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("tcfile", help="测试用例清单路径")
     ap.add_argument("--tp-file", default="", help="测试点清单路径")
-    ap.add_argument("--prd-dir", default="", help="资料目录（纯文本：md/markdown/txt/csv）")
+    ap.add_argument("--prd-dir", default="", nargs="+", help="资料目录（可传多个：文本资料目录 + 会话转换区）")
     ap.add_argument("--scope-list", default="", help="任务功能清单路径")
     args = ap.parse_args()
 
@@ -304,7 +308,7 @@ def main():
 
     # 6b) 标签取值须逐字命中 PRD —— 命中范围限定为任务功能清单「来源PRD文件」列锁定的 PRD，
     #     防止标签值只出现在开发设计文档等其他文件中也被判命中
-    if (args.prd_dir and os.path.isdir(args.prd_dir)):
+    if args.prd_dir and all(os.path.isdir(d) for d in args.prd_dir):
         files_map = load_file_texts(args.prd_dir)
         prd_files = set()
         if args.scope_list and os.path.isfile(args.scope_list):

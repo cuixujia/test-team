@@ -18,7 +18,7 @@ description: 测试流程机器脚本的共享代码库（mdtable 表格解析/�
 **两条既有归一口径红线**：
 
 - `norm_space_all`（TP/TC 清单校验口径：删除全部空白）与 `norm_ws_single`（引文机验口径：空白规范化为单空格）是**两个既有口径**，不得混用，也不得互相"统一"。
-- `norm_quote`（引文机验统一口径）：空白单格化 + Markdown 表格 `\|` 转义还原 + 全/半角标点折叠——表示法差异不再 FAIL；行号才是定位锚点，摘录字符由 `verify_quotes.py --autofix` 按行号自愈回填。
+- `norm_quote`（引文机验统一口径）：空白单格化 + Markdown 表格 `\|` 转义还原 + 全/半角标点折叠——表示法差异不再 FAIL；行号才是定位锚点；**流程统一不带 `--autofix`**（脚本参数保留，流程禁用），摘录字符误植=FAIL，由生成者按 `extract_excerpt.py` 输出重抄。
 
 **主表定位契约**：`parse_md_table` 的主表 = 第一个 `##` 章节之前的表（进入下一章节即结束）。
 
@@ -28,12 +28,21 @@ description: 测试流程机器脚本的共享代码库（mdtable 表格解析/�
 
 **归属说明**：本脚本是经理侧唯一可用的会话目录命名入口——经理的 shell 授权只放行 `python3 <skill>/scripts/<脚本>.py <参数>` 一类形态，编号只能由脚本的随机数生成器产出并查重；agent 不得手编、凑号或照抄历史目录号。
 
+### scripts/convert_office.py — docx/xlsx 入库前转换
+
+纯标准库（zipfile + ElementTree）确定性映射，不做渲染猜测。唯一实现在本模块，`prd-record-spec` 的入库仪式是唯一调用方（SKILL §一）。
+
+- **docx**：只取**定稿**（`w:ins` 合并、`w:del`/批注剔除），标题样式→`#`、表格→md 表格、列表→`- `；图片/公式落留痕注记+丢弃清单。
+- **xlsx**：一工作簿一 md；Sheet→`##`、首行表头、每行数据=md 表格一行（行号直引天然成立）；公式取缓存值；合并单元格只留左上值+留痕；日期/数字按显示值（numFmt）。
+- **落盘/幂等/防漂移**：产品控制见脚本头注释；转换产物必须能被 `mdtable.py` 解析（兼容性自验收），全部失败不落盘。
+
 ## 消费方（只读引用，二次分布声明）
 
 - `test-point-spec/scripts/check.py`、`verify_traceability.py`、`verify_test_points.py`
 - `test-case-spec/scripts/verify_test_cases.py`
 - `prd-record-spec/scripts/verify_requirement_baseline.py`、`verify_quotes.py`
 - `test-manager`（会话目录生成，唯一调用方）
+- `prd-record-spec`（`convert_office.py` 入库前唯一调用方）
 
 ## 维护规则
 

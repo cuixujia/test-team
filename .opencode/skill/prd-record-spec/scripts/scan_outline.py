@@ -94,27 +94,30 @@ def render_manifest(sources):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-dir", required=True, help="资料目录")
+    parser.add_argument("--input-dir", required=True, nargs="+",
+                        help="资料目录（可传多个：如用户文本目录 + 会话内转换区，合并为一个索引/清单）")
     parser.add_argument("--output", default="", help="结果落盘路径（默认 stdout）")
     parser.add_argument("--manifest", default="", help="指纹清单落盘路径（python 侧 sha256；与机验同口径）")
     args = parser.parse_args()
 
-    if not os.path.isdir(args.input_dir):
-        print(f"用法错误: 资料目录不存在 {args.input_dir}", file=sys.stderr)
-        return 2
+    for input_dir in args.input_dir:
+        if not os.path.isdir(input_dir):
+            print(f"用法错误: 资料目录不存在 {input_dir}", file=sys.stderr)
+            return 2
 
     sources, errors = [], []
-    for directory, dirs, files in os.walk(args.input_dir):
-        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
-        for name in sorted(files):
-            if name.startswith(".") or not name.lower().endswith(TEXT_EXTS):
-                continue
-            path = os.path.join(directory, name)
-            rel = os.path.relpath(path, args.input_dir).replace(os.sep, "/")
-            try:
-                sources.append(scan_file(path, rel))
-            except RuntimeError as exc:
-                errors.append(f"[WARN] 无法解析 {rel}: {exc}")
+    for input_dir in args.input_dir:
+        for directory, dirs, files in os.walk(input_dir):
+            dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+            for name in sorted(files):
+                if name.startswith(".") or not name.lower().endswith(TEXT_EXTS):
+                    continue
+                path = os.path.join(directory, name)
+                rel = os.path.relpath(path, input_dir).replace(os.sep, "/")
+                try:
+                    sources.append(scan_file(path, rel))
+                except RuntimeError as exc:
+                    errors.append(f"[WARN] 无法解析 {rel}: {exc}")
 
     sources.sort(key=lambda s: s["rel"])
     text = render(sources)

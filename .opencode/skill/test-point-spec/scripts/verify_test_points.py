@@ -88,7 +88,7 @@ def evidence_segments(cell):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("tpfile", help="测试点清单路径")
-    ap.add_argument("--input-dir", required=True, help="资料目录（直引证据就地逐字校验）")
+    ap.add_argument("--input-dir", required=True, nargs="+", help="资料目录（可多个；本关只做定位格式校验，保真由 quote-tp 裁决）")
     ap.add_argument("--scope-list", default="", help="任务功能清单路径")
     ap.add_argument("--clarifications", default="", help="澄清记录路径")
     args = ap.parse_args()

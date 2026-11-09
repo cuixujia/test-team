@@ -86,7 +86,7 @@ def clarification_rows(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", help="requirements-baseline.json")
-    parser.add_argument("--input-dir", required=True, help="资料目录：证据 file+lines+quote 对原文件逐字比对")
+    parser.add_argument("--input-dir", required=True, nargs="+", help="资料目录（可多个：文本资料目录 + 会话转换区）")
     parser.add_argument("--clarifications", default="", help="澄清记录；引用 CL 证据时必填")
     parser.add_argument("--manifest", default="", help="files-manifest.md 路径；提供时校验基线 input_files 与入库指纹一致")
     parser.add_argument("--freeze", action="store_true", help="冻结前校验：不允许待澄清需求")
@@ -97,11 +97,18 @@ def main():
     # 指纹绑定 + 引文对原文件逐字比对
     file_texts, file_digest = {}, {}
 
+    def find_source(rel):
+        """按登记 rel 依次在多个资料目录定位（唯一命中；跨目录冲突=登记歧义）。"""
+        hits = [d for d in args.input_dir if os.path.isfile(os.path.join(d, rel))]
+        if len(hits) > 1:
+            raise RuntimeError(f"资料文件跨目录同名歧义: {rel} → {hits}")
+        if not hits:
+            raise RuntimeError(f"资料文件不存在: {rel}")
+        return os.path.join(hits[0], rel)
+
     def load_v2_file(rel):
         if rel not in file_texts:
-            path = os.path.join(args.input_dir, rel)
-            if not os.path.isfile(path):
-                raise RuntimeError(f"资料文件不存在: {rel}")
+            path = find_source(rel)
             with open(path, encoding="utf-8-sig") as stream:
                 file_texts[rel] = stream.read().splitlines()
             with open(path, "rb") as stream:

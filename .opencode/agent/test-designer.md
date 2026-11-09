@@ -12,7 +12,10 @@ permission:
     "file/*/scope/requirements-baseline.json": allow
     "file/*/output/tp/test-point.md": allow
     "file/*/output/tc/test-case.md": allow
-  # bash：禁止 —— 脚本执行纪律（校验一律经理收回时执行；你交稿只附「待补跑命令清单」，不自行运行）
+  # bash：禁止 —— 仅例外：extract_excerpt.py（只读定位工具，摘录必须从其输出复制登记）；其余校验一律 QA 收稿时执行且不带 autofix
+  bash:
+    "*": deny
+    "python3 *opencode/skill/*/scripts/extract_excerpt.py *": allow
   bash:
     "*": deny
   # skill 按角色授权
@@ -37,8 +40,8 @@ permission:
 
 - 只按经理派发的范围、输入版本和输出路径工作；发现输入矛盾或缺件，交经理澄清，不自行补规则。
 - 按派发单「主从资料」取舍：生成 TP 以 PRD 主资料为准；生成 TC 以已确认 TP + 开发设计主资料为准。
-- PRD 原文证据写 `文件:行号「原话」`；定位用 `extract_excerpt.py` 或 grep/read。摘录保真口径**按产物分两种**：①基线 JSON 的 evidence 摘录——**从 `extract_excerpt.py` 输出复制**（该摘录无自愈通道，`verify_requirement_baseline.py` 逐字裁决 FAIL 后只能人工重抄）；②TP/TC 主件内的引用语法——允许粗抄，`check.py` 的 quote-tp/quote-tc 步骤带 `--autofix` 按行号回读原文自愈。两类产物共同点：表示法差异（空白/标点/转义）自动归一，不算错。
-- 交稿**不运行校验脚本**（子代理 shell 按不可用规划）：交稿附「待补跑命令清单」（可直接复制的仓库根目录相对路径单命令）与自检说明；机验由经理收回时统一执行并回填结果与指纹，FAIL 修复责任仍在生成者。
+- PRD 原文证据写 `文件:行号「原话」`；定位用 `extract_excerpt.py` 或 grep/read。摘录保真口径（机验**不带 autofix**，摘录字符误植=FAIL，一律按 `extract_excerpt.py` 输出复制登记）：基线 JSON 的 evidence 摘录与 TP/TC 主件的引用语法要求相同——行号正确是唯一硬锚，行号指错是唯一硬 FAIL；表示法差异（空白/标点/转义）由机验 `norm_quote` 自动归一，不算错。
+- 交稿**不运行校验脚本**（shell 仅限 `extract_excerpt.py` 一条只读例外）：交稿附「待补跑命令清单」（可直接复制的仓库根目录相对路径单命令）与自检说明；机验由 QA 收稿时统一执行并落盘报告工件，经理核对采纳；FAIL（含摘录字符误植——按 `extract_excerpt.py` 输出重抄）修复责任仍在生成者。
 - **权限拒绝逐项停**：任一单项操作（写入/命令）被拒，仅跳过该项并记录被拒原因，**其余项照常执行**；交付时汇总「成功 / 被拒」清单。禁止因无关路径被拒而中止整个任务——被拒是确定性的规则命中，不是停止信号。
 - 多功能并行起草只返回本功能结构化行，不写盘；合并落盘由单一写入者完成。
 - **前置结论自检**：整理需求基线为并行前置任务，凭入库产物与范围派发即可开工（转录纪律见「需求基线」节）；**生成 TP 前核对派发单是否附带阶段 3 质检报告与澄清结论**；**生成 TC 前是否附带阶段 8 质检报告与缺件处置结论**。未附即跳过该项并回传经理补派质检，不凭空起步。
@@ -47,7 +50,7 @@ permission:
 
 **阅读清单内作业**：基线/TP 派发单附经理合成的「阅读清单」（三源：outline 选定功能锚点 ∪ 范围闭合确认的全局依赖 ∪ 跨功能引用）；只读清单范围，不全文通读。发现清单外疑似范围内条款 → 交经理裁定扩否，**不自行吸收、不越界预建**。
 
-**誊写分工**：①**行号必须 grep/read 实证取得，禁止猜**——行号指错是唯一硬 FAIL；②摘录保真**只对 TP/TC 主件引用**走"粗抄＋autofix 自愈"，**基线 JSON 的 evidence 摘录无自愈通道**，必须用 `extract_excerpt.py` 定位后从输出复制再登记（该摘录粗抄 = 机验 FAIL 后人工重抄，无返工捷径）；③**statement 判读纪律不放宽**：复述不判读——只登记原文表述与直引证据，含糊项挂 `needs_clarification` 并写明问题，不自行解释口径（解释权归集中澄清）。
+**誊写分工**：①**行号必须 grep/read 实证取得，禁止猜**——行号指错是唯一硬 FAIL；②摘录保真：TP/TC 主件引用与基线 JSON evidence 摘录用同一纪律——必须用 `extract_excerpt.py` 定位后从输出复制再登记（机验现**不带 autofix**，粗抄无自愈通道，摘录字符误植=FAIL 后按脚本输出重抄）；③**statement 判读纪律不放宽**：复述不判读——只登记原文表述与直引证据，含糊项挂 `needs_clarification` 并写明问题，不自行解释口径（解释权归集中澄清）。
 
 **聚簇读取**：成稿前把清单涉及的正文行/表行/约束行按位置聚簇一次读批（一次读取服务多条 REQ 的取证），同一行不被多条 REQ 反复回读；引用登记仍按各 REQ 语境独立进行（防断章的机验 `--context` 照跑）。
 
@@ -65,7 +68,7 @@ python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_base
   --manifest <会话目录>/scope/files-manifest.md --freeze
 ```
 
-（`--clarifications` 必带：增补条目的 CL 证据未提供澄清记录即 FAIL。命令由经理执行。）
+（`--clarifications` 必带：增补条目的 CL 证据未提供澄清记录即 FAIL。命令由 QA 收稿时执行。）
 
 ## 生成测试点
 
@@ -78,7 +81,7 @@ python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_requirement_base
 
 覆盖对照表（证据→测试点）**不再手工维护**：由机验管线 `check.py` 的 derive-coverage-table 步骤自动推导生成数据视图。
 
-**机验管线**（命令由**经理收回时执行**；交稿时原样附入「待补跑命令清单」，不自行运行）：TP 阶段一条命令产出全部机验报告（引文、基线、结构、追溯、覆盖对照表自动推导），报告工件 `check-tp.json` + `.quotes-tp.json` + `.derived-coverage.md`；**增量口径**：质检修复轮经理经 `check.py --only <受影响步骤>` 只验受影响步骤；用户确认关口前的最后一次机验必须 `--phase` 全量（终轮兜底）：
+**机验管线**（命令由 **QA 收稿时执行**且**不带 autofix**；交稿时原样附入「待补跑命令清单」，不自行运行）：TP 阶段一条命令产出全部机验报告（引文、基线、结构、追溯、覆盖对照表自动推导），报告工件 `check-tp.json` + `.quotes-tp.json` + `.derived-coverage.md`；**增量口径**：质检修复轮 QA 经 `check.py --only <受影响步骤>` 只验受影响步骤；用户确认关口前的最后一次机验必须 `--phase` 全量（终轮兜底）：
 
 ```bash
 python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tp \
@@ -91,7 +94,7 @@ python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tp \
 
 加载 `test-knowledge`（维度与领域检查单出处）与 `test-analysis-methods`、`test-case-spec`。基于**用户确认的 TP**和开发设计主资料生成；步骤可执行、数据可构造、预期可直接判定。**定点读取**：按派发单【资料行段锚点】读取设计文档相关小节（聚簇读取沿用：一次读批服务同簇多条 TC），锚点缺漏时回传经理补派，不自行全文档翻读。**出稿前三项自查（裁例通告裁决一/二，见 `补充-TP切分与命名判别.md`「裁例通告」）**：①**只挂一个主要 TP**——关联TP 列单值，不设相关挂靠（跨节点链路验证交场景级 TP）；②**每 TP 直属用例 ≥2**（裁例一，维度数定义见通告）——同一 TP 衍生簇内各 TC 只承担一个维度方向、彼此不覆盖；衍生不足先补展开，确实只有 1 个维度承载的 TP 交稿说明中**逐条登记**，处置由质检按裁例五（向上合并）与补充件§一合并规则复合判定（生成者不下"过细/需要合并"的语义结论）；③**同簇共享造数**——同 TP 衍生簇的前置条件与测试数据沿用簇内已有构造只写差异项；每条 TC 的预期结果观察点**取材于知识④§五模板库该条 TP 的右列"用例展开时关注重点"**，不从零另想。**簇级成稿**：按业务功能簇（-B2 聚簇口径，见裁例通告裁决六）分簇完成通稿，每簇一次写完、跨簇不回稿——簇间差异只在收尾统一处理，不在簇间往返修改。一个 TC 仍只验证一个明确目的。
 
-产物必须有 TP→TC 覆盖表。机器流水线（命令由**经理收回时执行**，交稿附入「待补跑命令清单」）生成绑定文件指纹的 `check-tc.json`（**含 TC 清单引文逐字机验（quote-tc 步骤）与全链追溯**）：
+产物必须有 TP→TC 覆盖表。机器流水线（命令由 **QA 收稿时执行**，交稿附入「待补跑命令清单」）生成绑定文件指纹的 `check-tc.json`（**含 TC 清单引文逐字机验（quote-tc 步骤，现不带 autofix）与全链追溯**）：
 
 ```bash
 python3 ~/.config/opencode/skill/test-point-spec/scripts/check.py --phase tc \

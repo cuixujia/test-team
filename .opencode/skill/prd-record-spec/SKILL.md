@@ -10,17 +10,32 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 
 ## 一、入库仪式（经理执行，fail-fast）
 
-1. **格式确认**：资料目录内**只收文本格式**。发现 .docx/.pdf/图片等非文本件 →
-   **一次性告知用户「请替换为文本格式后再开工」并停止流程**；AI 不代转、无遗留分支。
+1. **格式确认**：资料目录内**只收文本格式**（.md/.markdown/.txt/.csv）。
+   发现 .docx/.xlsx → 经理在轻扫描**之前**先跑一次 `convert_office.py`（每份含 doc/xlsx 的资料目录各跑一次，秒级一次性）：
+
+   ```bash
+   python3 ~/.config/opencode/skill/test-script-lib/scripts/convert_office.py \
+     --input-dir <含docx/xlsx的资料目录> --output-dir <会话目录>/user-input-converted/
+   ```
+
+   - 转换成功的 md 是**后续全流程唯一文本权威**（引文、指纹一律指向它）；
+     **原件目录的 docx/xlsx 只读存档，任何阶段禁止引用**，AI 不再打开原件。
+   - **转换失败**（或出现 doc/pdf/图片等既不转也不收的件）→
+     **一次性告知用户「请替换为文本格式后再开工」并停止流程**；AI 不代转其余格式、无遗留分支。
+   - 幂等：转换区同名 md 已存在则跳过；产物路径=`转换区/<来源目录名>/原名.md`
+     （来源目录名前缀，杜绝跨资料目录同名互踩），来源内部子目录原样保留。
 2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；指纹段落同步登记 `state/status.md`）：
 
    ```bash
    python3 ~/.config/opencode/skill/prd-record-spec/scripts/scan_outline.py \
-     --input-dir <资料目录> --output <会话目录>/scope/outline.md \
+     --input-dir <资料目录> [<资料目录> ...] --output <会话目录>/scope/outline.md \
      --manifest <会话目录>/scope/files-manifest.md
    ```
 
    （`shasum` 仅可粗查变化，禁止用于登记指纹。）
+   存在 `user-input-converted/` 转换区 → 把它作为**一个额外目录**传进同一命令的 `--input-dir`
+   列表（scan_outline 可收多个目录，合并为一个 outline/manifest）；之后各阶段以合并登记的
+   文本全集为资料范围，docx/xlsx 原件不在清单内，自然进不了任何引文与指纹。
 3. **规则编号对账**：`outline.md` 中规则编号索引（BR/GOAL/EXCL/NFR/…）与文档自身附表核对，
    若缺失 → 资料本身残缺，入库即拦截。
 4. **资料角色登记**（1 次，用户选范围关口顺手确认）：
@@ -56,22 +71,23 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 | 摘录长度 | **≤40 字**连续原文；跨行写行区间 `L279-L280`，摘录用单空格连接 |
 | 正文逐字 | 摘录的**汉字/字母/数字内容**与原文件该行一致，禁止拷贝渲染后文本 |
 | 表示法差异自动消化 | 空白、全/半角标点、引号形制、Markdown `\|` 转义由机验 `norm_quote` 归一——不是错误，不需人修留痕（算法细节见 `verify_quotes.py` 头注释） |
-| 行号才是锚 | 行号正确、摘录缺字误植时 `--autofix` 按行号回读原文自动回填；**只有行号指错才 FAIL**，只定点修那一条 |
+| 行号才是锚 | 机验**不带 `--autofix`**：行号指错、摘录缺字误植均 FAIL（行号错唯一定位那条，误植按 `extract_excerpt.py` 输出重抄）；表示法差异仍由 `norm_quote` 归一不算错 |
 | 跨行摘录 | 摘录须包含第二行的行首标记（如列表符 `- `），因原文行连接后含此后缀 |
+| 文件标识 | 引用一律写 **files-manifest 登记的 rel 全路径**（如 `user-input-converted/user-input/设计稿.md`）——轻扫描收多目录时同名文件靠路径消歧，写裸文件名遇同名即歧义 FAIL |
 | 登记 | 摘录登记时用 `verify_quotes.py --context` 核对前后各 1 行，防断章；引用自带行号即可消歧，禁止"行内找相近句"的近似摘录 |
 
 ## 四、机验（零语义，脚本执行）
 
 ```bash
 python3 ~/.config/opencode/skill/prd-record-spec/scripts/verify_quotes.py \
-  <引用表.md 或 .json> --input-dir <资料目录> --context --report <引文报告.json>
+  <引用表.md 或 .json> --input-dir <资料目录> [<资料目录> ...] --context --report <引文报告.json>
 ```
 
 - 引用表可为 Markdown 管道表（表头契约：首列=`来源文件`、次列=`行号`）或 JSON 数组；`--extract-from` 直接按引用语法从清单抽引用，免维护引用表；
-- `--report` 落 JSON 工件（含清单指纹、失败明细、`auto_fixes` 留痕）——**机器关采信以工件为准**，stdout 不作数；`--autofix` 自愈（源文件为产物且旧摘录唯一时原位回写）；
+- `--report` 落 JSON 工件（含清单指纹、失败明细）——**机器关采信以工件为准**，stdout 不作数；`--autofix` 参数保留但**流程统一不带**（摘录自愈停用，误植由生成者按 `extract_excerpt.py` 输出重抄）；
 - **增量机验**：修复轮经 `check.py --only <受影响步骤>` 只跑受影响步骤，终轮一次全量兜底；
 - **质检报告内引文不重复机验**：产物证据本体已随机验管线裁决，报告内复引由「定向抽查」（见质检契约）覆盖；
-- FAIL 仅指「行号指错/骨架不命中」，必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**；
+- FAIL 指「行号指错/骨架不命中/摘录字符误植」，必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**；
 - **交付机验统一入口**：`test-point-spec/scripts/check.py`（一次跑完出一份报告）；`verify_quotes.py` 亦可单独运行；澄清触发与覆盖校验沿用其内置追溯步骤。
 
 ## 五、需求基线（结构契约，证据=直引）
