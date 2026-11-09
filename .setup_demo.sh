@@ -36,7 +36,7 @@ cat > "$PRD_DIR/prd-demo.md" <<'MD'
 MD
 
 # ---------- 经理侧：入库（轻扫描 + 指纹清单，Python 口径） ----------
-python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
+python3 .opencode/skill/prd-record-spec/scripts/scan_outline.py \
   --input-dir "$PRD_DIR" --output "$S/scope/outline.md" \
   --manifest "$S/scope/files-manifest.md" >/dev/null
 

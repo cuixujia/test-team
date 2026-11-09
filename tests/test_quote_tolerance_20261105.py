@@ -21,7 +21,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-SK = os.path.join(ROOT, ".opencode", "skills")
+SK = os.path.join(ROOT, ".opencode", "skill")
 
 
 def run(cmd, cwd=ROOT):

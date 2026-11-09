@@ -14,7 +14,7 @@
 
 ## 知识库（唯一语义判据）
 
-测试语义判定的唯一权威在 `.opencode/skills/test-knowledge/`：四份**原文**（①通用测试方法论、②测试维度定义、③通用测试规则、④测试点生成指南；行文中的流程/输出包装已裁剪，只留判定标准）+ 两份**补充件**（TP 切分与命名判别、领域专项检查单）。各 skill 只引用不复述；口径冲突时**以知识库为准**（改 skill，不改知识）。调优路径：改补充件，或经用户决定整体替换原文。导入原始版本留存于仓库根 `测试知识/`（只读存档）。
+测试语义判定的唯一权威在 `.opencode/skill/test-knowledge/`：四份**原文**（①通用测试方法论、②测试维度定义、③通用测试规则、④测试点生成指南；行文中的流程/输出包装已裁剪，只留判定标准）+ 两份**补充件**（TP 切分与命名判别、领域专项检查单）。各 skill 只引用不复述；口径冲突时**以知识库为准**（改 skill，不改知识）。调优路径：改补充件，或经用户决定整体替换原文。导入原始版本留存于仓库根 `测试知识/`（只读存档）。
 
 ## 资料约定（唯一流程）
 
@@ -64,13 +64,13 @@ output/reports/qa-report.md        # 全流程唯一 QA 报告，分节追加：
 
 ```bash
 # 资料入库：标题树 + 规则编号索引 + 指纹清单（Python 侧 sha256，与机验同口径）
-python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py \
+python3 .opencode/skill/prd-record-spec/scripts/scan_outline.py \
   --input-dir <资料目录> --output <会话目录>/scope/outline.md \
   --manifest <会话目录>/scope/files-manifest.md
 
 # 机验统一入口：一条命令产出"引文逐字（TP/TC 各自）+ 基线 + 清单结构 + 追溯 + 报告新鲜度"的
 # 带指纹 JSON 报告，供质检按工件采信（阶段/报告命名：check-tp / check-tc / check-full）
-python3 .opencode/skills/test-point-spec/scripts/check.py \
+python3 .opencode/skill/test-point-spec/scripts/check.py \
   --phase full --input-dir <资料目录> \
   --baseline <requirements-baseline.json> \
   --scope-list <scope-list.md> --tp-file <test-point.md> --tc-file <test-case.md> \
@@ -78,24 +78,24 @@ python3 .opencode/skills/test-point-spec/scripts/check.py \
 #  可加 --manifest <会话目录>/scope/files-manifest.md：基线 input_files 与入库清单逐条交叉校验
 
 # 引文逐字机验（可单独运行；--report 落带清单指纹的 JSON 工件）
-python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py \
+python3 .opencode/skill/prd-record-spec/scripts/verify_quotes.py \
   <引用表或清单文件> --input-dir <资料目录> --context --report <引文报告.json>
 
 # 摘录定位辅助（可选）：按章节定位并截取 ≤40 字连续原句
-python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py \
+python3 .opencode/skill/prd-record-spec/scripts/extract_excerpt.py \
   --prd-dir <资料目录> --locate <定位串> [--candidates N]
 
 # 冻结需求基线前校验结构、范围和逐条证据（input_files 指纹绑定）
-python3 .opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py \
+python3 .opencode/skill/prd-record-spec/scripts/verify_requirement_baseline.py \
   <requirements-baseline.json> --input-dir <资料目录> \
   --manifest <会话目录>/scope/files-manifest.md \
   --clarifications <clarifications.md> --freeze
 
 # 数据视图：清单主件 → 纯数据表（语义质检修复闭环、终轮全量机验 PASS 后由经理生成；行数/编号与主表自洽，仅作查看）
-python3 .opencode/skills/test-point-spec/scripts/export_tables.py \
+python3 .opencode/skill/test-point-spec/scripts/export_tables.py \
   --phase tp --tp-file <test-point.md> --baseline <requirements-baseline.json> \
   --scope-list <scope-list.md> --output <test-point-table.md>
-python3 .opencode/skills/test-point-spec/scripts/export_tables.py \
+python3 .opencode/skill/test-point-spec/scripts/export_tables.py \
   --phase tc --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
 ```
 

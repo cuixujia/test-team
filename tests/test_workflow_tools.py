@@ -8,9 +8,9 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SC = os.path.join(ROOT, ".opencode", "skills", "prd-record-spec", "scripts")
-TPS = os.path.join(ROOT, ".opencode", "skills", "test-point-spec", "scripts")
-TCS = os.path.join(ROOT, ".opencode", "skills", "test-case-spec", "scripts")
+SC = os.path.join(ROOT, ".opencode", "skill", "prd-record-spec", "scripts")
+TPS = os.path.join(ROOT, ".opencode", "skill", "test-point-spec", "scripts")
+TCS = os.path.join(ROOT, ".opencode", "skill", "test-case-spec", "scripts")
 
 QUOTE_TEXT = "提交人仅可查看本项目的风险。"
 

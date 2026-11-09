@@ -9,19 +9,19 @@ ng(){ FAIL=$((FAIL+1)); printf '[FAIL] %s\n' "$1"; }
 W="workspace/runtime_demo/file"
 S="$W/sess-demo-0001"
 PRD="$W/project-docs"
-CHECK=".opencode/skills/test-point-spec/scripts/check.py"
-VQ=".opencode/skills/prd-record-spec/scripts/verify_quotes.py"
-VB=".opencode/skills/prd-record-spec/scripts/verify_requirement_baseline.py"
-VP=".opencode/skills/test-point-spec/scripts/verify_test_points.py"
-VC=".opencode/skills/test-case-spec/scripts/verify_test_cases.py"
-VT=".opencode/skills/test-point-spec/scripts/verify_traceability.py"
+CHECK=".opencode/skill/test-point-spec/scripts/check.py"
+VQ=".opencode/skill/prd-record-spec/scripts/verify_quotes.py"
+VB=".opencode/skill/prd-record-spec/scripts/verify_requirement_baseline.py"
+VP=".opencode/skill/test-point-spec/scripts/verify_test_points.py"
+VC=".opencode/skill/test-case-spec/scripts/verify_test_cases.py"
+VT=".opencode/skill/test-point-spec/scripts/verify_traceability.py"
 BASE="$S/scope/requirements-baseline.json"
 TP="$S/output/tp/test-point.md"
 TC="$S/output/tc/test-case.md"
 
 echo "========== 1. Agent 定义完整性 =========="
 for a in test-manager test-designer test-qa-expert; do
-  f=".opencode/agents/$a.md"
+  f=".opencode/agent/$a.md"
   [ -f "$f" ] && ok "$a.md 存在" || { ng "$a.md 缺失"; continue; }
   grep -q '^mode: ' "$f" && ok "$a.md 有 mode" || ng "$a.md 缺 mode"
   grep -q '^permission:' "$f" && grep -q '^  edit:' "$f" && ok "$a.md 有 edit 权限" || ng "$a.md 缺 edit 权限"
@@ -31,35 +31,35 @@ done
 
 echo
 echo "========== 2. 角色隔离 =========="
-grep -q 'mode: subagent' .opencode/agents/test-designer.md && ok "designer 为 subagent" || ng "designer 模式错"
-grep -q 'mode: subagent' .opencode/agents/test-qa-expert.md && ok "qa 为 subagent" || ng "qa 模式错"
-grep -q 'mode: primary' .opencode/agents/test-manager.md && ok "manager 为 primary" || ng "manager 模式错"
-grep -q '^  question: deny' .opencode/agents/test-designer.md && ok "designer 禁止 question" || ng "designer question 未禁用"
-grep -q '^  question: deny' .opencode/agents/test-qa-expert.md && ok "qa 禁止 question" || ng "qa question 未禁用"
-grep -q '^  task: deny' .opencode/agents/test-designer.md && ok "designer 禁止 subagent" || ng "designer subagent 未禁用"
+grep -q 'mode: subagent' .opencode/agent/test-designer.md && ok "designer 为 subagent" || ng "designer 模式错"
+grep -q 'mode: subagent' .opencode/agent/test-qa-expert.md && ok "qa 为 subagent" || ng "qa 模式错"
+grep -q 'mode: primary' .opencode/agent/test-manager.md && ok "manager 为 primary" || ng "manager 模式错"
+grep -q '^  question: deny' .opencode/agent/test-designer.md && ok "designer 禁止 question" || ng "designer question 未禁用"
+grep -q '^  question: deny' .opencode/agent/test-qa-expert.md && ok "qa 禁止 question" || ng "qa question 未禁用"
+grep -q '^  task: deny' .opencode/agent/test-designer.md && ok "designer 禁止 subagent" || ng "designer subagent 未禁用"
 # 单一写入者：只看 permissions 块（frontmatter），不看正文
 perm_block(){ sed -n '1,/^---$/p' "$1" | sed -n '2,/^---$/p'; }
-perm_block .opencode/agents/test-designer.md | grep -q 'output/reports' && ng "designer 被授予报告写权限" || ok "designer 无报告写权限"
-perm_block .opencode/agents/test-designer.md | grep -q 'anchors.md' && ng "designer 仍被授予锚点底册写权限" || ok "designer 无锚点底册写权限"
-perm_block .opencode/agents/test-qa-expert.md | grep -q 'output/tp\|output/tc' && ng "qa 被授予产物写权限" || ok "qa 无产物写权限"
-perm_block .opencode/agents/test-manager.md | grep -q 'output/tp\|output/tc\|output/reports\|source-catalog' && ng "manager 被授予产物/目录写权限" || ok "manager 无产物与资料目录写权限"
+perm_block .opencode/agent/test-designer.md | grep -q 'output/reports' && ng "designer 被授予报告写权限" || ok "designer 无报告写权限"
+perm_block .opencode/agent/test-designer.md | grep -q 'anchors.md' && ng "designer 仍被授予锚点底册写权限" || ok "designer 无锚点底册写权限"
+perm_block .opencode/agent/test-qa-expert.md | grep -q 'output/tp\|output/tc' && ng "qa 被授予产物写权限" || ok "qa 无产物写权限"
+perm_block .opencode/agent/test-manager.md | grep -q 'output/tp\|output/tc\|output/reports\|source-catalog' && ng "manager 被授予产物/目录写权限" || ok "manager 无产物与资料目录写权限"
 
 echo
 echo "========== 3. Skill 与脚本完整性（V2 唯一，无旧版遗留） =========="
 for s in test-knowledge prd-record-spec prd-quality-check tdd-quality-check test-analysis-methods test-point-spec test-case-spec test-script-lib; do
-  [ -f ".opencode/skills/$s/SKILL.md" ] && ok "skill $s" || ng "skill $s 缺失"
+  [ -f ".opencode/skill/$s/SKILL.md" ] && ok "skill $s" || ng "skill $s 缺失"
 done
-for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skills/prd-record-spec/scripts/scan_outline.py .opencode/skills/prd-record-spec/scripts/extract_excerpt.py .opencode/skills/test-point-spec/scripts/check.py .opencode/skills/test-script-lib/scripts/mdtable.py; do
+for f in "$VQ" "$VB" "$VP" "$VC" "$VT" .opencode/skill/prd-record-spec/scripts/scan_outline.py .opencode/skill/prd-record-spec/scripts/extract_excerpt.py .opencode/skill/test-point-spec/scripts/check.py .opencode/skill/test-script-lib/scripts/mdtable.py; do
   [ -f "$f" ] && ok "$(basename "$f")" || ng "$(basename "$f") 缺失"
 done
 for f in build_source_catalog.py verify_source_catalog.py verify_anchors.py; do
-  [ -f ".opencode/skills/prd-record-spec/scripts/$f" ] && ng "旧版脚本 $f 未退役" || ok "旧版脚本 $f 已退役"
+  [ -f ".opencode/skill/prd-record-spec/scripts/$f" ] && ng "旧版脚本 $f 未退役" || ok "旧版脚本 $f 已退役"
 done
-grep -rq 'source_catalog_sha256\|--ledger\|--anchors' .opencode/skills/*/scripts/*.py && ng "脚本仍残留 V1 接口" || ok "脚本无 V1 接口残留"
+grep -rq 'source_catalog_sha256\|--ledger\|--anchors' .opencode/skill/*/scripts/*.py && ng "脚本仍残留 V1 接口" || ok "脚本无 V1 接口残留"
 
 echo
 echo "========== 4. 校验脚本正面回归（应全部通过）=========="
-python3 .opencode/skills/prd-record-spec/scripts/scan_outline.py --input-dir "$PRD" >/dev/null 2>&1 && ok "scan_outline 轻扫描通过" || ng "scan_outline 失败"
+python3 .opencode/skill/prd-record-spec/scripts/scan_outline.py --input-dir "$PRD" >/dev/null 2>&1 && ok "scan_outline 轻扫描通过" || ng "scan_outline 失败"
 python3 "$VQ" "$TP" --input-dir "$PRD" --extract-from >/dev/null 2>&1 && ok "verify_quotes 直接抽 TP 引用通过" || ng "verify_quotes TP 引用失败"
 python3 "$VB" "$BASE" --input-dir "$PRD" --clarifications "$S/state/clarifications.md" --freeze >/dev/null 2>&1 && ok "verify_requirement_baseline（直引+指纹+冻结）通过" || ng "verify_requirement_baseline 失败"
 python3 "$VP" "$TP" --input-dir "$PRD" --scope-list "$S/state/scope-list.md" --clarifications "$S/state/clarifications.md" >/dev/null 2>&1 && ok "verify_test_points 通过" || ng "verify_test_points 失败"
@@ -271,7 +271,7 @@ fi
 echo
 echo "========== 6. 全链交付校验（check full + 报告指纹）=========="
 REPORT="$S/output/reports/check-full.json"
-python3 .opencode/skills/test-point-spec/scripts/check.py --phase full \
+python3 .opencode/skill/test-point-spec/scripts/check.py --phase full \
   --input-dir "$PRD" --baseline "$BASE" --scope-list "$S/state/scope-list.md" \
   --tp-file "$TP" --tc-file "$TC" --clarifications "$S/state/clarifications.md" \
   --report "$REPORT" >/dev/null 2>&1 && ok "全链机械校验通过" || ng "全链机械校验失败"
@@ -287,14 +287,14 @@ grep -q 'source-catalog\|anchors' "$REPORT" >/dev/null 2>&1 && ng "报告仍含 
 
 echo
 echo "===== 6b. 摘录定位与批量（纯文本辅助）====="
-OUT=$(python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "4" --max-chars 40 2>&1)
+OUT=$(python3 .opencode/skill/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "4" --max-chars 40 2>&1)
 if echo "$OUT" | grep -q "提交时校验审核人身份"; then ok "extract_excerpt 提取正确"; else ng "extract_excerpt 提取失败: $OUT"; fi
 LOC=/tmp/_loc.txt
 printf '功能需求\n不存在章节\n' > "$LOC"
-OUT=$(python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate-file "$LOC" 2>&1)
+OUT=$(python3 .opencode/skill/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate-file "$LOC" 2>&1)
 echo "$OUT" | grep -q "1/2 条命中" && ok "批量定位一次取回多条" || ng "批量定位失败: $OUT"
 rm -f "$LOC"
-python3 .opencode/skills/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "NOT-EXIST" >/dev/null 2>&1 && ng "不存在的定位未拒绝" || ok "不存在的定位被拒绝"
+python3 .opencode/skill/prd-record-spec/scripts/extract_excerpt.py --prd-dir "$PRD" --locate "NOT-EXIST" >/dev/null 2>&1 && ng "不存在的定位未拒绝" || ok "不存在的定位被拒绝"
 
 echo
 echo "========== 7. 工作流工具单元回归 =========="
@@ -315,7 +315,7 @@ done
 
 echo
 echo "========== 9. 知识聚焦（references 无流程/输出包装句）=========="
-for f in .opencode/skills/test-knowledge/references/*.md; do
+for f in .opencode/skill/test-knowledge/references/*.md; do
   if grep -qE 'Agent 接到|Agent 拿到|AI 测试 Agent|Agent 生成|Agent 参考|思维导图|记入资料质检报告|适用时机：阶段' "$f"; then
     ng "知识文件含流程/输出包装句: $f"
   else

@@ -13,7 +13,7 @@ import unittest
 spec = importlib.util.spec_from_file_location(
     "screen_intent_words",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 ".opencode/skills/test-script-lib/scripts/screen_intent_words.py"))
+                 ".opencode/skill/test-script-lib/scripts/screen_intent_words.py"))
 siw = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(siw)
 
