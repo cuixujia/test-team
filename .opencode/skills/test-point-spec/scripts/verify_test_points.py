@@ -17,7 +17,8 @@
   7. 输出 [SHA256] 行（交稿自证/收回核验共用同一指纹来源）
 
 用法：
-  python3 verify_test_points.py <测试点清单> --input-dir <资料目录> [--scope-list <任务功能清单>] [--clarifications <澄清记录>]
+  python3 <SKILLS_ROOT>/test-point-spec/scripts/verify_test_points.py <TP主件绝对路径> \
+    --input-dir <资料目录绝对路径> --scope-list <scope-list绝对路径> --clarifications <clarifications绝对路径>
 
 退出码：0 = 通过；1 = 存在 FAIL；2 = 用法错误
 """
@@ -49,13 +50,13 @@ def warn(m):
     print(f"[WARN] {m}")
 
 
-# 逐字比对已收敛至 check.py 的 quote-tp 步（verify_quotes.py，归一比对 + --autofix 自愈），
+# 逐字比对已收敛至 check.py 的 quote-tp 步（verify_quotes.py，归一比对、误植即 FAIL），
 # 本脚本不再对摘录做原文比对（2026-11-05 收敛 A1：消除双重机验与口径分歧）；
-# 引文裁决口径以 check.py 报告工件为准。
+# 引文裁决口径以 check.py 报告工件为准；--autofix 自愈不在机验管线内。
 
 
 # parse_md_table / parse_first_table / norm / read_text / sha256_of 已收敛至
-# .opencode/skills/test-script-lib/scripts/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
+# <SKILLS_ROOT>/test-script-lib/scripts/mdtable.py（唯一实现，禁止本地副本——2026-11-05 收敛）
 
 
 # 直引证据（文件:行号+原话，唯一 PRD 证据格式，见 prd-record-spec/SKILL.md）
@@ -192,7 +193,7 @@ def main():
                 elif tok not in cl_ids:
                     fail(f"澄清编号不在澄清记录中: {r[0]} ({tok})")
                 continue
-            # 2026-11-05 收敛（A1）：不再在此对原文件逐字比对——保真与自愈统一由 quote-tp 步裁决；
+            # 2026-11-05 收敛（A1）：不再在此对原文件逐字比对——保真由 quote-tp 步裁决，误植即 FAIL；
             # 本关校验 token 结构（文件与行号写法可解析，防幻觉锚点）。
             rel, spec, quote = cite
             if not re.fullmatch(r"[A-Za-z0-9_\-./\u4e00-\u9fff]+\.(?:md|markdown|txt|csv)", rel) \

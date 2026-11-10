@@ -4,9 +4,11 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 ---
 
 # 溯源规范（纯文本直引，唯一流程）
+> **路径基准**：`<SKILLS_ROOT>` 默认 `~/.config/opencode/skills`（Linux 下由 shell 展开，换机器自动跟随 HOME），由派发单【路径基准】注入实际绝对路径；`<WORKSPACE_ROOT>` 为工作空间根目录绝对路径。本文中的脚本路径取 `<SKILLS_ROOT>/<skill>/scripts/...`，跨 skill 资源取 `<SKILLS_ROOT>/<skill>/references/...`，输入与产物取 `<WORKSPACE_ROOT>/file/session-XXXXXX/...`；命令发出前须替换为实际绝对路径，禁止相对路径与残留占位符。
+
 
 > 资料只收**可定位行号的文本格式**（UTF-8、行导向：.md/.markdown/.txt/.csv）。
-> 全流程不再存在目录/锚点底册分支；引用一律 `文件:行号「原话」`，保真由脚本裁决。
+> 引用一律 `文件:行号「原话」`，保真由脚本裁决。
 
 ## 一、入库仪式（经理执行，fail-fast）
 
@@ -14,8 +16,8 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
    发现 .docx/.xlsx → 经理在轻扫描**之前**先跑一次 `convert_office.py`（每份含 doc/xlsx 的资料目录各跑一次，秒级一次性）：
 
    ```bash
-   python3 ~/.config/opencode/skills/test-script-lib/scripts/convert_office.py \
-     --input-dir <含docx/xlsx的资料目录> --output-dir <会话目录>/user-input-converted/
+   python3 <SKILLS_ROOT>/test-script-lib/scripts/convert_office.py \
+     --input-dir <WORKSPACE_ROOT>/file/project-docs --output-dir <WORKSPACE_ROOT>/file/session-XXXXXX/user-input-converted/
    ```
 
    - 转换成功的 md 是**后续全流程唯一文本权威**（引文、指纹一律指向它）；
@@ -27,9 +29,9 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 2. **轻扫描一条命令**（Python 侧 sha256，与机验管线同口径；指纹段落同步登记 `state/status.md`）：
 
    ```bash
-   python3 ~/.config/opencode/skills/prd-record-spec/scripts/scan_outline.py \
-     --input-dir <资料目录> [<资料目录> ...] --output <会话目录>/scope/outline.md \
-     --manifest <会话目录>/scope/files-manifest.md
+   python3 <SKILLS_ROOT>/prd-record-spec/scripts/scan_outline.py \
+     --input-dir <WORKSPACE_ROOT>/file/project-docs [<WORKSPACE_ROOT>/file/project-docs ...] --output <WORKSPACE_ROOT>/file/session-XXXXXX/scope/outline.md \
+     --manifest <WORKSPACE_ROOT>/file/session-XXXXXX/scope/files-manifest.md
    ```
 
    （`shasum` 仅可粗查变化，禁止用于登记指纹。）
@@ -70,8 +72,8 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 |---|---|
 | 摘录长度 | **≤40 字**连续原文；跨行写行区间 `L279-L280`，摘录用单空格连接 |
 | 正文逐字 | 摘录的**汉字/字母/数字内容**与原文件该行一致，禁止拷贝渲染后文本 |
-| 表示法差异自动消化 | 空白、全/半角标点、引号形制、Markdown `\|` 转义由机验 `norm_quote` 归一——不是错误，不需人修留痕（算法细节见 `verify_quotes.py` 头注释）。归一只覆盖**摘录文本内部**的表示法差异；**摘录所在单元格的完整性是另一回事**——表格行原文的管道符不转义会切断单元格，须作者自行转义 |
-| 行号才是锚 | 机验**不带 `--autofix`**：行号指错、摘录缺字误植均 FAIL（行号错唯一定位那条，误植按 `extract_excerpt.py` 输出重抄）；表示法差异仍由 `norm_quote` 归一不算错 |
+| 表示法差异自动消化 | 空白、全/半角标点、引号形制、Markdown `\|` 转义由机验 `norm_quote` 归一——不算错误。归一只覆盖**摘录文本内部**的表示法差异；**摘录所在单元格的完整性是另一回事**——表格行原文的管道符不转义会切断单元格，须作者自行转义 |
+| 行号才是锚 | **机验管线不具备自愈能力**（`--autofix` 仅离线修复可用）：行号指错、摘录缺字误植均 FAIL（误植按上方 `--by-line` 完整命令输出重抄）；表示法差异仍由 `norm_quote` 归一不算错 |
 | 跨行摘录 | 摘录须包含第二行的行首标记（如列表符 `- `），因原文行连接后含此后缀 |
 | 文件标识 | 引用一律写 **files-manifest 登记的 rel 全路径**（如 `user-input-converted/user-input/设计稿.md`）——轻扫描收多目录时同名文件靠路径消歧，写裸文件名遇同名即歧义 FAIL |
 | 登记 | 摘录登记时用 `verify_quotes.py --context` 核对前后各 1 行，防断章；引用自带行号即可消歧，禁止"行内找相近句"的近似摘录 |
@@ -79,16 +81,25 @@ description: 溯源规范（唯一流程）——纯文本资料直引（文件:
 ## 四、机验（零语义，脚本执行）
 
 ```bash
-python3 ~/.config/opencode/skills/prd-record-spec/scripts/verify_quotes.py \
-  <引用表.md 或 .json> --input-dir <资料目录> [<资料目录> ...] --context --report <引文报告.json>
+python3 <SKILLS_ROOT>/prd-record-spec/scripts/verify_quotes.py \
+  <WORKSPACE_ROOT>/file/session-XXXXXX/output/reports/quotes.md --input-dir <WORKSPACE_ROOT>/file/project-docs [<WORKSPACE_ROOT>/file/project-docs ...] --context --report <WORKSPACE_ROOT>/file/session-XXXXXX/output/reports/quotes.json
 ```
 
 - 引用表可为 Markdown 管道表（表头契约：首列=`来源文件`、次列=`行号`）或 JSON 数组；`--extract-from` 直接按引用语法从清单抽引用，免维护引用表；
-- `--report` 落 JSON 工件（含清单指纹、失败明细）——**机器关采信以工件为准**，stdout 不作数；`--autofix` 参数保留但**流程统一不带**（摘录自愈停用，误植由生成者按 `extract_excerpt.py` 输出重抄）；
-- **增量机验**：修复轮经 `check.py --only <受影响步骤>` 只跑受影响步骤，终轮一次全量兜底；
+- `--report` 落 JSON 工件（含清单指纹、失败明细）——**机器关采信以工件为准**，stdout 不作数；**机验管线不具备自愈能力**：`check.py` 永不传 `--autofix`，`verify_quotes.py` 的 `--autofix` 仅供维护者离线修复（须同带 `--report`），误植即 FAIL，由生成者按上方 `--by-line` 完整命令输出重抄；
+- **增量机验**：修复轮经 `check.py --phase <tp|tc> --only <受影响步骤>` 只跑受影响步骤（`--only` 步骤名须属于当前 phase），阶段 12 关口②前 `--phase full` 全程一次兜底；
+
+**引文误植重抄命令**（按行号回读原文，输出可直接复制的 `文件:L行号「摘录」`）：
+
+```bash
+python3 <SKILLS_ROOT>/prd-record-spec/scripts/extract_excerpt.py \
+  --prd-dir <WORKSPACE_ROOT>/file/project-docs \
+  --by-line "<文件名>:L<行号或区间>" --max-chars 40
+```
+
 - **质检报告内引文不重复机验**：产物证据本体已随机验管线裁决，报告内复引由「定向抽查」（见质检契约）覆盖；
-- FAIL 指「行号指错/骨架不命中/摘录字符误植」，必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**；
-- **交付机验统一入口**：`test-point-spec/scripts/check.py`（一次跑完出一份报告）；`verify_quotes.py` 亦可单独运行；澄清触发与覆盖校验沿用其内置追溯步骤。
+- FAIL 指「行号指错或摘录字符误植」，必须修复后重跑；**引文保真的裁决权在脚本，不在复查者**；
+- **交付机验统一入口**：`<SKILLS_ROOT>/test-point-spec/scripts/check.py`（一次跑完出一份报告）；`verify_quotes.py` 亦可单独运行；澄清触发与覆盖校验沿用其内置追溯步骤。
 
 ## 五、需求基线（结构契约，证据=直引）
 
@@ -141,7 +152,7 @@ python3 ~/.config/opencode/skills/prd-record-spec/scripts/verify_quotes.py \
 
 三张表的结构被上表消费方解析；任何其他表不参与机器解析（留痕用）。
 
-**章节定位契约**：三张表（功能清单/资料角色登记/归属登记）**必须各自置于一个 `##` 章节标题之下**，且功能清单为**第一个 `##` 章节下的第一张表**——解析器按章节边界取表，首表裸置于章节标题之外会与后续表合并解析（fixture 参考 `tests/test_check_pipeline.py`：`## 一、功能清单 / ## 二、资料角色登记 / ## 三、归属登记`）。
+**章节定位契约**：三张表（功能清单/资料角色登记/归属登记）**必须各自置于一个 `##` 章节标题之下**，且功能清单为**第一个 `##` 章节下的第一张表**——解析器按章节边界取表，首表裸置于章节标题之外会与后续表合并解析。章节标题依 `## 一、功能清单 / ## 二、资料角色登记 / ## 三、归属登记` 书写。
 
 > QA 各类报告（资料体检/对账/产物质检）统一写入 `output/reports/qa-report.md` 分节（qa 载体契约见 test-qa-expert）。
 

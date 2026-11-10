@@ -4,35 +4,37 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 ---
 
 # 测试用例（TC）规范
+> **路径基准**：`<SKILLS_ROOT>` 默认 `~/.config/opencode/skills`（Linux 下由 shell 展开，换机器自动跟随 HOME），由派发单【路径基准】注入实际绝对路径；`<WORKSPACE_ROOT>` 为工作空间根目录绝对路径。本文中的脚本路径取 `<SKILLS_ROOT>/<skill>/scripts/...`，跨 skill 资源取 `<SKILLS_ROOT>/<skill>/references/...`，输入与产物取 `<WORKSPACE_ROOT>/file/session-XXXXXX/...`；命令发出前须替换为实际绝对路径，禁止相对路径与残留占位符。
+
 
 ## 定义
 
 **测试用例（TC）= 一条含完整执行信息（前置条件、测试数据、操作步骤、预期结果）的可执行验证，一条用例只验证一个目的。**
 
 - 可执行：执行者无需追问即可照做
-- 与 TP 的关系：TC 只关联**一个** TP（裁例通告裁决二——`test-knowledge/references/补充-TP切分与命名判别.md`「裁例通告」）；`关联TP` 为单值，无「主要/相关」之分，写多个编号或夹分隔符即机验 FAIL（`verify_test_cases.py` 校验 4）；一个 TC 仍只允许一个明确的通过/失败目的。
+- 与 TP 的关系：TC 只关联**一个** TP（裁例通告裁决二——`<SKILLS_ROOT>/test-knowledge/references/补充-TP切分与命名判别.md`「裁例通告」）；`关联TP` 为单值，无「主要/相关」之分，写多个编号或夹分隔符即机验 FAIL（`verify_test_cases.py` 校验 4）；一个 TC 仍只允许一个明确的通过/失败目的。
 
 ## 字段规范
 
 | 字段 | 要求 |
 |---|---|
 | 编号 | `TC-NNN`，三位序号，本次任务内只增不复用（允许空号）；**不含业务功能编号** |
-| 标题 | 「场景 + 预期」结构，判据见知识补充件《TC列判据》§一·标题（含一次判定原则） |
+| 标题 | 「场景 + 预期」结构，判据见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·标题（含一次判定原则） |
 | 关联TP | **单一** TP 编号（该 TC 唯一归属的 TP，裁例通告裁决二）；多编号、逗号/顿号/空格分隔、格式非法一律机验 FAIL（`verify_test_cases.py` 校验 4）；每 TP 直属 TC ≥2 由校验 5b 强制 |
 | 优先级 | P0 核心主流程 / P1 重要分支与边界 / P2 次要场景 / P3 罕见与健壮性 |
 | 前置条件 | 可构造的具体状态（账户、数据、权限），禁止「系统正常」类空话；环境/版本要求属前置条件，不单列字段 |
-| 测试数据 | 判据见知识补充件《TC列判据》§一·测试数据 |
-| 操作步骤 | 判据见知识补充件《TC列判据》§一·操作步骤 |
-| 预期结果 | 判据见知识补充件《TC列判据》§一·预期结果 |
+| 测试数据 | 判据见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·测试数据 |
+| 操作步骤 | 判据见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·操作步骤 |
+| 预期结果 | 判据见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·预期结果 |
 | 用例类型 | 正向 / 反向 / 边界 / 异常 / 流程（归类判据见质量标准） |
 | 标签 | 归属标记，**可含多个标签值**，格式见下文「标签规范」 |
 
 ## 质量标准
 
-- **一个 pass/fail 结论**（一次判定原则，见知识补充件《TC列判据》§一·标题）：验证「金额超限拒绝」的用例不得同时断言手续费计算；预期结果可有多个观察点（如「余额不变 + 流水生成」），但必须同属一次判定，出现第二种判定即拆分。
+- **一个 pass/fail 结论**（一次判定原则，见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·标题）：验证「金额超限拒绝」的用例不得同时断言手续费计算；预期结果可有多个观察点（如「余额不变 + 流水生成」），但必须同属一次判定，出现第二种判定即拆分。
 - **用例类型归类判据**：边界 = 取值在分区边缘（恰等于/恰超出）；异常 = 系统或环境故障（超时/断网/脏数据）；反向 = 操作者合法但违反业务规则被拒；流程 = 跨页面/跨系统的多步骤业务旅程；正向 = 其余正常场景。交叉时按 **边界 > 异常 > 反向 > 流程 > 正向** 取第一个命中（正向兜底）。
-- **步骤可执行性判据**：见知识补充件《TC列判据》§一·操作步骤。
-- **预期可判定判据**：见知识补充件《TC列判据》§一·预期结果。
+- **步骤可执行性判据**：见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·操作步骤。
+- **预期可判定判据**：见`<SKILLS_ROOT>/test-knowledge/references/补充-TC列判据.md`§一·预期结果。
 - **前置条件与测试数据分离**：前置是状态，数据是输入。
 - **排序规则**：TC 顺序承接其关联 TP 的顺序（TP 排序判据 = 知识④§六步骤6，诠释 = 业务功能聚簇，见裁例通告裁决六）；同一 TP 派生的 TC **连续相邻**，组内多条 TC 沿用知识④§六步骤6 的优先级次序。排序缺陷是 TC 级问题，交设计专家重排（改主件）。
 
@@ -87,14 +89,14 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 覆盖对照表章节标题含：`覆盖对照表`（列序：TP编号 | 覆盖的 TC 编号 | 未覆盖原因）。
 - **关联TP 单值（裁决二）**：`关联TP` 列必须严格等于一个 `TP-\d{3}` 编号；多编号、逗号/顿号/空格/分号分隔或格式非法一律 FAIL（`verify_test_cases.py` 校验 4，不依赖 `--tp-file`；`verify_traceability.py` 端到端追溯关同口径）。
 - **每 TP ≥2 TC（裁决一）**：按主件 `关联TP` 计数，已覆盖的每个 TP 直属 TC 须 ≥2；不足判 FAIL（`verify_test_cases.py` 校验 5b），覆盖对照表「未覆盖原因」列已登记例外说明的 TP 豁免并交质检按维度数裁决。
-- **n:1 关系矩阵**：覆盖对照表「覆盖的 TC 编号」列保持多值（TP:TC = 1:n），与上条 `关联TP` 单值共同构成 n:1；`export_tables.py` 视图只输出单值，主件多值时 WARN。
+- **n:1 关系矩阵**：覆盖对照表「覆盖的 TC 编号」列保持多值（TP:TC = 1:n），与上条 `关联TP` 单值共同构成 n:1；`<SKILLS_ROOT>/test-point-spec/scripts/export_tables.py` 视图只输出单值，主件多值时 WARN。
 - TC 编号正则：`TC-\d{3}`；优先级枚举：P0/P1/P2/P3；用例类型枚举：正向/反向/边界/异常/流程。
 - 标签键枚举：`所属系统`/`所属业务活动`/`所属业务功能`（取值来源见标签规范；值须逐字命中 PRD）。
 - 标签命中范围：校验器从 `state/scope-list.md`「资料角色登记」表（首列列名=`文件`）读取资料文件白名单——scope-list 机器契约见 `prd-record-spec` SKILL。
-- 校验统一入口：`check.py --phase tc|full`。
+- 校验统一入口：`<SKILLS_ROOT>/test-point-spec/scripts/check.py --phase tp|tc|full`（`check.py` 归属 `test-point-spec`；本 skill 的 `scripts/` 只有 `verify_test_cases.py`）。
 <!-- CONTRACT-END: test-case-spec -->
 
-> 表格解析唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skills/…`）；`scripts/verify_test_cases.py` 从其导入。
+> 表格解析唯一实现在 `<SKILLS_ROOT>/test-script-lib/scripts/mdtable.py`；`scripts/verify_test_cases.py` 从其导入。
 
 ## 派生数据视图（test-case-table.md，只读投影）
 
@@ -108,13 +110,13 @@ description: 测试用例（TC）的唯一权威定义——十字段规范、�
 - 测试点验证意图 = `关联TP` 单值所指向 TP 的验证意图，按 `--tp-file` 清单回填；该 TP 不存在留空 WARN。
 - 所属系统/业务活动/业务功能 = 主件标签三键拆列，缺键按标签规范留空。
 - 依据（主TP）= 该唯一 TP 的依据指针串（`文件:行号`、`CL-xxx`）。**视图列不带 `L`**——指针级写法仅属视图，主件内引用不得仿写。
-- 视图第 3 列只输出主件的单一 `关联TP`；主件若含多值，按首个回填并 WARN，机验校验 4 判 FAIL（`export_tables.py`）。
-- **主件引用格式与机验联动**：主件单元格内的资料引用**一律 `文件名:L行号「摘录」`（带 L）**——机验 `quote-tc` 按该语法抽取逐字比对；写成不带 L 的指针写法不会被抽中，quote-tc 整体跳过=放弃逐字保真机验；机验有显式 WARN，见 WARN 即修正格式重跑，**不得采信静默降级结果**。
-- 主件变更即视图失效：机验 PASS 后重跑 `export_tables.py` 刷新。
+- 视图第 3 列只输出主件的单一 `关联TP`；主件若含多值，按首个回填并 WARN，机验校验 4 判 FAIL（`test-point-spec/scripts/export_tables.py`）。
+- **主件引用格式与机验联动**：主件单元格内的资料引用**一律 `文件名:L行号「摘录」`（带 L）**——机验 `quote-tc` 按该语法抽取逐字比对；写成不带 L 的指针写法或清单无任何直引语法时，`check.py` 以 `NO_L_PREFIX` / `NO_CITATION_SYNTAX` 直接判 FAIL，修正格式后重跑。
+- 主件变更即视图失效：机验 PASS 后重跑 `<SKILLS_ROOT>/test-point-spec/scripts/export_tables.py` 刷新。
 
 ```bash
-python3 ~/.config/opencode/skills/test-point-spec/scripts/export_tables.py --phase tc \
-  --tc-file <test-case.md> --tp-file <test-point.md> --output <test-case-table.md>
+python3 <SKILLS_ROOT>/test-point-spec/scripts/export_tables.py --phase tc \
+  --tc-file <WORKSPACE_ROOT>/file/session-XXXXXX/output/tc/test-case.md --tp-file <WORKSPACE_ROOT>/file/session-XXXXXX/output/tp/test-point.md --output <WORKSPACE_ROOT>/file/session-XXXXXX/output/tc/test-case-table.md
 ```
 
 行数与编号集合同主表自洽（脚本内置断言，不一致 exit 1）。
@@ -123,6 +125,6 @@ python3 ~/.config/opencode/skills/test-point-spec/scripts/export_tables.py --pha
 
 - **必须输入** = 阶段 7 已验收测试点清单 + 生成资料包（PRD 原文、任务功能清单、澄清记录）+ 开发设计文档（前端/后端）。**可选** = 数据库设计文档、存量测试用例；缺席标注「未提供」跳过，存在但不可读不得静默跳过，移交经理。冲突以主资料为准（主从优先级见 `prd-record-spec`），可能改变 TC 范围或判定的冲突交经理澄清。
 - **存量测试用例仅作场景与步骤写法参考**：禁止照抄历史编号与标题；每条 TC 仍须满足字段规范、关联本次验收基线的 TP。
-- 交付不得出现业务功能编号（归属走标签列）；交付前机验 `check.py --phase tc`、最终交付 `--phase full`（指纹未变方可交付）均由 QA 收稿时执行（生成者交稿附命令清单，不自行运行）；交稿自检确认机验报告含 `.quotes-tc.json` 工件且 quote-tc 非 skipped（生效前提：主件引用带 `L`）。
+- 交付不得出现业务功能编号（归属走标签列）；阶段 11 收稿机验 `check.py --phase tc`（只验 TC 三步）、阶段 12 关口②前终轮 `--phase full` 全程一次，均由 QA 执行（生成者交稿附命令清单，只跑只读预检、不自行运行机验）。`check-tc.quotes-tc.json` 等引文分件（分件名 = 报告同名前缀 + `.quotes-<kind>.json`）由 QA 机验产出，生成者交稿不检查、不据此声明自检通过。
 - 阶段 12 评审：**用户直接删改的行即刻生效、不回炉复检**（经理记录差异到状态档案）；如需继续修订，只对**受影响行**增量复检，终轮全量兜底。
 - 设计材料变更或缺失必需资料补齐 → 受影响 TC 标记失效、重生成、增量复检；未受影响的已确认基线保留。

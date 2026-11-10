@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 """extract_excerpt.py — 程序化提取 PRD 原文摘录（禁止模型手抄）
 
-按锚点定位从 PRD 原文中提取连续原句，输出到 stdout 并报告字符数。
+按锚点定位或按行号从 PRD 原文提取连续原句，输出到 stdout 并报告字符数。
 手抄摘录是摘录漂移的根因——所有写入底册/依据列的摘录必须经本脚本提取。
+引文机验默认「误植即 FAIL」，修复轮用 --by-line 按行号回读原文切片重抄。
+
+路径基准：<SKILLS_ROOT> 默认 ~/.config/opencode/skills，<WORKSPACE_ROOT> 由派发单注入；
+命令发出前占位符须替换为实际绝对路径。
 
 用法：
   # 按章节定位提取
-  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1"
+  python3 <SKILLS_ROOT>/prd-record-spec/scripts/extract_excerpt.py \
+    --prd-dir <WORKSPACE_ROOT>/file/project-docs --locate "4.3.1"
+
+  # 按行号取字（与主件引用契约 文件:L行号「摘录」 对齐，摘录误植修复专用）
+  python3 <SKILLS_ROOT>/prd-record-spec/scripts/extract_excerpt.py \
+    --prd-dir <WORKSPACE_ROOT>/file/project-docs --by-line "业务需求说明书.md:L596" --max-chars 40
+  python3 ... --by-line "业务需求说明书.md:L596-598"
 
   # 批量提取（一次调用取多个定位串，N 条锚点不再 N 次调用）
-  python3 extract_excerpt.py --prd-dir <资料目录> --locate-file <定位串清单.txt>
+  python3 ... --prd-dir <WORKSPACE_ROOT>/file/project-docs --locate-file <定位串清单绝对路径>
   #   定位串清单：每行一个定位串；空行与 # 开头的注释行跳过
 
-  # 候选句模式：不止自动挑一句，而是一次给出 top-N 句候选供点名采用
-  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1" --candidates 3
-
-  # 指定最大字数与截断策略
-  python3 extract_excerpt.py --prd-dir <资料目录> --locate "4.3.1" --max-chars 40
+  # 候选句模式与最大字数
+  python3 ... --prd-dir <WORKSPACE_ROOT>/file/project-docs --locate "4.3.1" --candidates 3 --max-chars 40
 
 退出码：0 = 提取成功；1 = 未找到或无法定位；2 = 用法错误
 说明：只做定位与截取，不改写、不拼接、不跨段；资料为纯文本格式。
@@ -28,7 +35,7 @@ import argparse
 
 
 def read_text(path):
-    for enc in ("utf-8", "utf-8-sig", "gbk"):
+    for enc in ("utf-8-sig", "utf-8", "gbk"):
         try:
             with open(path, "r", encoding=enc) as f:
                 return f.read()
@@ -207,14 +214,23 @@ def main():
     ap.add_argument("--locate-file", default="", help="批量模式：定位串清单文件（每行一个，空行与 # 注释跳过）")
     ap.add_argument("--max-chars", type=int, default=40, help="最大字符数")
     ap.add_argument("--candidates", type=int, default=1, help="每个定位串输出的候选句数量（默认 1）")
+    ap.add_argument("--by-line", default="", help='按行号取字："<文件名>:L<行号或区间>"，输出可直接复制的 文件:L行号「摘录」')
     args = ap.parse_args()
 
+    if not os.path.isabs(args.prd_dir):
+        print(f"用法错误: --prd-dir 必须为绝对路径: {args.prd_dir}", file=sys.stderr)
+        return 2
     if not os.path.isdir(args.prd_dir):
         print(f"用法错误: 资料目录不存在 {args.prd_dir}", file=sys.stderr)
+        return 2
+    if args.by_line and (args.locate or args.locate_file):
+        print("用法错误: --by-line 不与 --locate / --locate-file 同用", file=sys.stderr)
         return 2
     if args.locate_file and args.locate:
         print("用法错误: --locate-file 为批量模式，不与 --locate 同用", file=sys.stderr)
         return 2
+    if args.by_line:
+        return _extract_by_line(args.prd_dir, args.by_line, args.max_chars)
 
     # 批量模式：一次调用提取多个定位串
     if args.locate_file:
@@ -284,6 +300,43 @@ def _print_candidates(locate, source, sents):
         print(f"# 来源: {source}  定位: {locate}")
         print(f"# 字符数: {len(sent)}")
         print(sent)
+
+
+def _extract_by_line(prd_dir, spec, max_chars):
+    """按 `文件名:L行号或区间` 回读原文切片，输出可直接复制的 文件:L行号「摘录」。"""
+    m = re.fullmatch(r"(.+\.(?:md|markdown|txt|csv)):L(\d+)(?:\s*[-~]\s*(\d+))?",
+                     spec.strip(), re.IGNORECASE)
+    if not m:
+        print(f"用法错误: --by-line 格式应为 文件名:L行号 或 文件名:L起始-结束，收到: {spec}",
+              file=sys.stderr)
+        return 2
+    name = m.group(1)
+    start = int(m.group(2))
+    end = int(m.group(3)) if m.group(3) else start
+    if end < start:
+        print("用法错误: 行区间结束行小于起始行", file=sys.stderr)
+        return 2
+    target = None
+    for path in iter_prd_files(prd_dir):
+        if path.endswith(name) or os.path.basename(path) == os.path.basename(name):
+            target = path
+            break
+    if target is None:
+        print(f"未找到文件: {name}（在 {prd_dir} 下）", file=sys.stderr)
+        return 1
+    lines = read_text(target).split("\n")
+    if start > len(lines):
+        print(f"行号越界: {name} 共 {len(lines)} 行，请求 L{start}", file=sys.stderr)
+        return 1
+    region = "\n".join(lines[start - 1:end]).strip()
+    if not region:
+        print(f"指定行为空: {name}:L{start}", file=sys.stderr)
+        return 1
+    excerpt = region if len(region) <= max_chars else region[:max_chars]
+    anchor = f"L{start}" if start == end else f"L{start}-{end}"
+    print(f"# 来源: {os.path.basename(target)}  行号: {anchor}  字符数: {len(excerpt)}")
+    print(f"{os.path.basename(target)}:{anchor}「{excerpt}」")
+    return 0
 
 
 if __name__ == "__main__":

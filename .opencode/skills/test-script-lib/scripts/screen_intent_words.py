@@ -10,9 +10,9 @@
 - 结果词/处理逻辑/具体值词面与补充件§二一致；未命中该三类属"PRD 原词照抄"场景的，
   由人工按主从裁决与直引证据认定，不在本工具免责范围之外另设判定。
 
-用法（经理侧，shell 单命令形态）：
-  python3 .opencode/skills/test-script-lib/scripts/screen_intent_words.py \
-    --tp-file <测试点清单.md> [--report <输出的json路径>]
+用法：
+  python3 <SKILLS_ROOT>/test-script-lib/scripts/screen_intent_words.py \
+    --tp-file <TP主件绝对路径> [--report <报告JSON绝对路径>]
 """
 import argparse
 import hashlib

@@ -4,6 +4,8 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 ---
 
 # 测试点（TP）规范
+> **路径基准**：`<SKILLS_ROOT>` 默认 `~/.config/opencode/skills`（Linux 下由 shell 展开，换机器自动跟随 HOME），由派发单【路径基准】注入实际绝对路径；`<WORKSPACE_ROOT>` 为工作空间根目录绝对路径。本文中的脚本路径取 `<SKILLS_ROOT>/<skill>/scripts/...`，跨 skill 资源取 `<SKILLS_ROOT>/<skill>/references/...`，输入与产物取 `<WORKSPACE_ROOT>/file/session-XXXXXX/...`；命令发出前须替换为实际绝对路径，禁止相对路径与残留占位符。
+
 
 ## 定义
 
@@ -30,7 +32,7 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 
 **判定标准以知识库为准**：功能点拆分与测试点粒度执行知识④《测试点生成指南》§二（拆分规则）、§四（颗粒度标准）、§六步骤 5（全集覆盖自检 `(a)~(f)`）；其中「全集」以裁决十的资料命中小类清单为准，逐项核对，原文④不再改动。
 
-切分与合并的团队判别细则（PRD 锚定三条件、合并规则、"该拆该合"两句话、三违规反例）见 `test-knowledge/references/补充-TP切分与命名判别.md` §一——质检（阶段 6）按同一文件执行，质检与生成用同一判据。
+切分与合并的团队判别细则（PRD 锚定三条件、合并规则、"该拆该合"两句话、三违规反例）见 `<SKILLS_ROOT>/test-knowledge/references/补充-TP切分与命名判别.md` §一——质检（阶段 6）按同一文件执行，质检与生成用同一判据。
 
 **描述不清的交接**：PRD 没说明并列条件是否存在不同规则 → 先按同一目标合并成一条，并把该模糊点记入资料质检报告的问题清单要求澄清，**不得自行补造规则**（判据与合并动作在补充件 §一，交接登记在此）。
 
@@ -48,15 +50,15 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 - 场景级 TP：`验证` + `跨模块流程描述`（可用"-"串联关键节点）
 - 禁止行为清单见知识④§3.3（不机械全覆盖、不凑数、不重复、不臆造）；「按需 / 不机械全覆盖」的统一解释以 `补充-TP切分与命名判别.md` 裁决十为准（资料命中的小类必出、未命中的不出）
 
-团队补充口径（对象抄 PRD 原词、短语级 ≤30 字、判错口袋清单）见 `test-knowledge/references/补充-TP切分与命名判别.md` §二。
+团队补充口径（对象抄 PRD 原词、短语级 ≤30 字、判错口袋清单）见 `<SKILLS_ROOT>/test-knowledge/references/补充-TP切分与命名判别.md` §二。
 
 ## 边界：TP 不是什么
 
 **一 · 不是功能描述**：功能点 =「系统能做什么」，不出现「验证」字样；TP =「验证什么」。每个末层功能点必须有 TP，空功能点违规。
 
-**二 · 不是测试用例**：TP 不带步骤、数据、具体预期文案。TP:TC 对应口径由知识与裁例通告裁定（`test-knowledge/references/补充-TP切分与命名判别.md`「裁例通告」裁决一/二）：一条 TP 衍生至少 2 条用例（机验 `verify_test_cases.py` 校验 5b 强制）；一条 TC 只关联**一个** TP（`关联TP` 单值，多值即机验 FAIL），只允许一个明确的通过/失败目的。
+**二 · 不是测试用例**：TP 不带步骤、数据、具体预期文案。TP:TC 对应口径由知识与裁例通告裁定（`<SKILLS_ROOT>/test-knowledge/references/补充-TP切分与命名判别.md`「裁例通告」裁决一/二）：一条 TP 衍生至少 2 条用例（机验 `verify_test_cases.py` 校验 5b 强制）；一条 TC 只关联**一个** TP（`关联TP` 单值，多值即机验 FAIL），只允许一个明确的通过/失败目的。
 
-**三 · 覆盖不全不行**：识别时按知识②的大类→维度→小类**逐项判定资料是否提及**（裁决十）：每个业务功能下，命中的小类必须至少出一个该小类 TP，未命中的小类不出 TP；判定只有命中/未命中两态，按资料原文直接归类，不挂 CL 澄清。非功能小类与功能小类同一口径，不再另设「高风险」条件。领域强化检查单见 `test-knowledge/references/补充-领域检查单.md`。
+**三 · 覆盖不全不行**：识别时按知识②的大类→维度→小类**逐项判定资料是否提及**（裁决十）：每个业务功能下，命中的小类必须至少出一个该小类 TP，未命中的小类不出 TP；判定只有命中/未命中两态，按资料原文直接归类，不挂 CL 澄清。非功能小类与功能小类同一口径，不再另设「高风险」条件。领域强化检查单见 `<SKILLS_ROOT>/test-knowledge/references/补充-领域检查单.md`。
 
 ## 一致性与基线
 
@@ -95,11 +97,11 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 （需求基线内每条需求必须出现；范围外或不测试必须给出已确认的原因）
 ```
 
-**排序规则**：TP 排序判据以知识④§六步骤6 为准，"同一功能点下"诠释＝业务功能聚簇、簇内按优先级（裁例通告裁决六）；本文件不再规定排序口径（原「执行动线编排」条款已废止）。排序缺陷是 TP 级问题，交设计专家重排（改主件），不阻塞语义判定本身。
+**排序规则**：TP 排序判据以知识④§六步骤6 为准，"同一功能点下"诠释＝业务功能聚簇、簇内按优先级（裁例通告裁决六）；本文件不规定排序口径。排序缺陷是 TP 级问题，交设计专家重排（改主件），不阻塞语义判定本身。
 
 > **列序为校验契约**，`scripts/verify_test_points.py` 按此解析，禁止调整。
 >
-> **覆盖对照表（证据→测试点）不再是交付物**：该表可从主表自动推导，由 `check.py` 的 `derive-coverage-table` 步骤生成数据视图（`check-<phase>.derived-coverage.md`，与报告工件同目录、同指纹绑定）；专家不手工维护。若手工提供该表，校验器仍按既有契约做一致性校验（防与主表矛盾）。
+> **覆盖对照表（证据→测试点）不是交付物**：该表可从主表自动推导，由 `check.py` 的 `derive-coverage-table` 步骤生成数据视图（`check-<phase>.derived-coverage.md`，与报告工件同目录、同指纹绑定）；专家不手工维护。若手工提供该表，校验器仍按既有契约做一致性校验（防与主表矛盾）。
 
 ### 机器契约（`<!-- CONTRACT -->`，校验器一致性单测的对照源）
 
@@ -112,31 +114,31 @@ description: 测试点（TP）的清单规范与机器契约——定义、证�
 - **辅资料补充验证点豁免**：来自辅资料（tech/brd 等）、无基线需求可挂的验证点，主表行内含标记 `辅资料补充` 即可——追溯关 WARN 留痕采信，**不 FAIL、不强制伪挂靠**；未带标记且未被任何需求覆盖仍 FAIL。
 - TP 编号正则：`TP-\d{3}`；类型枚举：功能/异常/边界/流程/非功能；分析方法枚举：等价类/边界值/判定表/因果图/场景法/状态迁移/正交实验/错误推测/探索性测试（方法定义与选型归知识①，机验只断非空）。
 - **行序与编号优先级**：修复轮「受控新增」以**编号只增、不复用、不改存量行**为最高优先——新增行追加主表表尾（即使证据行号提示应前插），不重排不重编；行序让位于编号稳定性（下游视图/追溯按编号锚定）。
-- 校验统一入口：`check.py --phase tp|full`。
+- 校验统一入口：`check.py --phase tp|tc|full`。
 <!-- CONTRACT-END: test-point-spec -->
 
-> 表格解析的唯一实现在 `test-script-lib/scripts/mdtable.py`（`~/.config/opencode/skills/…`）；`scripts/verify_test_points.py` 从其导入，本地副本违规。
+> 表格解析的唯一实现在 `<SKILLS_ROOT>/test-script-lib/scripts/mdtable.py`（`<SKILLS_ROOT>`）；`scripts/verify_test_points.py` 从其导入，本地副本违规。
 
 ## 派生数据视图（test-point-table.md，只读投影）
 
-权威数据始终是主件。视图由**经理**在**语义质检修复闭环、终轮全量机验 PASS 后**（确认关口前）脚本派生；**确认关口与一切用户可见一律用 table，语义质检只看主件**：
+权威数据始终是主件。视图由**经理**在**语义质检修复闭环、阶段 7 关口①前终轮机验 PASS 后**（确认关口前）脚本派生；**确认关口与一切用户可见一律用 table，语义质检只看主件**：
 
 - 视图只含一张表（无标题、无引语）：列 = 编号 / 验证意图 / 类型 / 依据（指针化）/ 所属系统 / 业务活动 / 业务功能；
 - 依据列**指针化**：直引取 `文件:行号`、澄清取 `CL-xxx`，不保留原话（保真与语义由主件机验裁决）；
 - 所属系统/业务活动取 `state/scope-list.md`「归属登记」按功能名称查得，查不到留空并 WARN；
 - 业务功能 = `需求→TP 覆盖表` 反查 TP→REQ → 基线 `feature_id` → `selected_scope` **功能名称原文**（编号不进视图；name 缺失降级 WARN，自检 exit 1）；
-- 主件变更即视图失效：机验 PASS 后经理重跑 `export_tables.py` 刷新，无人工同步步骤。
+- 主件变更即视图失效：机验 PASS 后经理重跑 `<SKILLS_ROOT>/test-point-spec/scripts/export_tables.py` 刷新，无人工同步步骤。
 
 ```bash
-python3 ~/.config/opencode/skills/test-point-spec/scripts/export_tables.py --phase tp \
-  --tp-file <test-point.md> --baseline <requirements-baseline.json> \
-  --scope-list <scope-list.md> --output <test-point-table.md>
+python3 <SKILLS_ROOT>/test-point-spec/scripts/export_tables.py --phase tp \
+  --tp-file <WORKSPACE_ROOT>/file/session-XXXXXX/output/tp/test-point.md --baseline <WORKSPACE_ROOT>/file/session-XXXXXX/scope/requirements-baseline.json \
+  --scope-list <WORKSPACE_ROOT>/file/session-XXXXXX/state/scope-list.md --output <WORKSPACE_ROOT>/file/session-XXXXXX/output/tp/test-point-table.md
 ```
 
 行数与编号集合同主表自洽（脚本内置断言，不一致 exit 1）。
 
 ## 交付与变更
 
-- 交付不得出现业务功能编号（归属用名称原文）；交付前机验 `check.py --phase tp --report <output/reports/check-tp.json>` 由 QA 收稿时执行（生成者交稿附命令清单，不自行运行），FAIL 修复重跑；摘录按 `extract_excerpt.py` 输出逐字复制，保真由 `verify_quotes.py` 裁决，定位可用 grep/read 或 `extract_excerpt.py`。
+- 交付不得出现业务功能编号（归属用名称原文）；阶段 6 收稿机验 `check.py --phase tp` 由 QA 执行，复检轮 `--phase tp --only <受影响步骤>`，阶段 7 关口①前终轮 `--phase tp --freeze-baseline`。生成者交稿前跑只读预检、附绝对路径命令清单，不自行运行机验；摘录按 `prd-record-spec` 机验节给出的 `--by-line` 完整命令重抄，误植即 FAIL。
 - 阶段 7 验收：**用户删改的行即刻生效、不回炉复检**（经理记录差异到状态档案）；如需继续修订，只对**受影响行**增量复检（终轮全量兜底），编号只增不改不复用。
 - 设计材料变更 → 受影响 TP 标记失效，失效 TP 禁止派生 TC；用户澄清「没说清」的问题后 → 重合并/拆分受影响 TP 并增量复检；TP 基线错误经用户确认 → 回阶段 5 受控变更（编号只增不复用；失效行整行移除，编号永久空置、不得复用）。

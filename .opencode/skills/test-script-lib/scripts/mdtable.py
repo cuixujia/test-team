@@ -7,8 +7,8 @@ verify_traceability.py 各自维护一份语义相近但不完全相同的表格
 注意：`norm_space_all`（TP/TC 清单校验口径：删除全部空白）与 `norm_ws_single`
 （引文机验口径：空白规范化为单空格）是**两个既有口径**，不得混用，也不得互相"统一"。
 2026-11-05 复盘收敛：引文机验统一升格为 `norm_quote`（空白单格化 + Markdown 表格
-`\|` 转义还原 + 全/半角标点折叠）——表示法差异不再 FAIL；行号才是定位锚点，
-摘录字符由 `verify_quotes.py --autofix` 按行号自愈回填。
+`\\|` 转义还原 + 全/半角标点折叠）——表示法差异不再 FAIL；行号才是定位锚点，
+摘录字符误植一律 FAIL，由生成者按 `extract_excerpt.py --by-line` 输出重抄。
 """
 import hashlib
 import re
@@ -32,7 +32,7 @@ def norm_quote(text):
     2) 全/半角标点与引号形制折叠（双侧同射，不改变字符内容本身）；
     3) 空白统一为单空格。
     逗号点差、引号形制差、转义符差不再导致 FAIL；摘录正文（汉字/英文/数字）差异仍 FAIL，
-    由 verify_quotes --autofix 按行号回读原文自愈。
+    交生成者按 extract_excerpt.py --by-line 回读原文重抄后重跑机验。
     """
     s = (text or "").replace("\\|", "|")
     for src, dst in _QUOTE_CHAR_MAP.items():
@@ -76,7 +76,7 @@ def _cells(line):
     明确「Markdown `|` 转义由机验 norm_quote 归一，不是错误」，故切分层必须与归一层口径一致：
     切分只认未转义的 `|`，转义一律保留在单元格内交 norm_quote 还原。
     边界：行尾一个 `|` 恒为定界符、无条件剥离（库契约=去定界符后切分、无幽灵空列）；
-    "单元格内容以 `\|` 结尾又紧跟定界符"属畸形行，取内容完整性（保留转义），不补幽灵空列。
+    "单元格内容以 `\\|` 结尾又紧跟定界符"属畸形行，取内容完整性（保留转义），不补幽灵空列。
     """
     s = line.strip()
     if s.startswith("|"):

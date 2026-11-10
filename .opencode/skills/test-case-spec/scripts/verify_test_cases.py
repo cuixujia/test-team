@@ -14,7 +14,8 @@
   7. 交付物中不得出现业务功能编号
 
 用法：
-  python3 verify_test_cases.py <测试用例清单> [--tp-file <测试点清单>] [--prd-dir <资料目录>] [--scope-list <任务功能清单>]
+  python3 <SKILLS_ROOT>/test-case-spec/scripts/verify_test_cases.py <TC主件绝对路径> \
+    --tp-file <TP主件绝对路径> --prd-dir <资料目录绝对路径> --scope-list <scope-list绝对路径>
 
 退出码：0 = 通过；1 = 存在 FAIL；2 = 用法错误
 """
@@ -109,7 +110,7 @@ PRD_EXTS = _PRD_EXTS
 
 
 # parse_md_table / parse_first_table / norm / read_text 的唯一实现在
-# .opencode/skills/test-script-lib/scripts/mdtable.py（2026-11-05 收敛，禁止本地副本）；
+# <SKILLS_ROOT>/test-script-lib/scripts/mdtable.py（2026-11-05 收敛，禁止本地副本）；
 # split_tp_refs 是本文件本地的单值违规诊断工具（裁决二后不再解析「相关 TP」）。
 
 
@@ -162,6 +163,21 @@ def main():
     ap.add_argument("--prd-dir", default="", nargs="+", help="资料目录（可传多个：文本资料目录 + 会话转换区）")
     ap.add_argument("--scope-list", default="", help="任务功能清单路径")
     args = ap.parse_args()
+
+    for name in ("tcfile", "tp_file", "scope_list"):
+        value = getattr(args, name)
+        if value and not os.path.isabs(value):
+            print(f"用法错误: --{name.replace('_', '-')} 必须为绝对路径: {value}", file=sys.stderr)
+            return 2
+    if args.prd_dir:
+        for d in args.prd_dir:
+            if not os.path.isabs(d):
+                print(f"用法错误: --prd-dir 必须为绝对路径: {d}", file=sys.stderr)
+                return 2
+        missing = [d for d in args.prd_dir if not os.path.isdir(d)]
+        if missing:
+            print(f"用法错误: --prd-dir 目录不存在或非目录: {' '.join(missing)}", file=sys.stderr)
+            return 2
 
     if not os.path.isfile(args.tcfile):
         print(f"[FAIL] 文件不存在: {args.tcfile}")
@@ -390,7 +406,7 @@ def main():
             else:
                 ok("标签取值逐字命中 PRD 校验通过" + scoped_note)
     else:
-        print("[WARN] 未提供 --prd-dir，跳过标签取值命中校验")
+        fail("未提供 --prd-dir，标签取值命中校验（6b）未执行；机验管线必须传入资料目录绝对路径")
 
     # 7) 交付物不得出现业务功能编号
     if args.scope_list and os.path.isfile(args.scope_list):

@@ -18,11 +18,11 @@
   - 自洽校验：视图行数与编号集合必须与主表一致，否则 exit 1。
 
 用法：
-  python3 export_tables.py --phase tp --tp-file <test-point.md> \
-    --baseline <requirements-baseline.json> --scope-list <scope-list.md> \
-    --output <test-point-table.md>
-  python3 export_tables.py --phase tc --tc-file <test-case.md> \
-    --tp-file <test-point.md> --output <test-case-table.md>
+  python3 <SKILLS_ROOT>/test-point-spec/scripts/export_tables.py --phase tp \
+    --tp-file <TP主件绝对路径> --baseline <基线JSON绝对路径> \
+    --scope-list <scope-list绝对路径> --output <TP视图绝对路径>
+  python3 <SKILLS_ROOT>/test-point-spec/scripts/export_tables.py --phase tc \
+    --tc-file <TC主件绝对路径> --tp-file <TP主件绝对路径> --output <TC视图绝对路径>
 
 退出码：0 = 生成成功；1 = 解析/自洽失败；2 = 用法错误
 """

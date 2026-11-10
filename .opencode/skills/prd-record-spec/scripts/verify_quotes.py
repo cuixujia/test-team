@@ -2,13 +2,15 @@
 r"""verify_quotes.py — 引文逐字机验（溯源规范 V2：文件:行号 直引，见 SKILL.md）。
 
 对引用表逐条验证：给定的「摘录原文 + 来源文件 + 行号」确实存在于原文件该行。
-2026-11-05 复盘收敛后的判定口径（行号=定位锚点，逐字=内容事实）：
+判定口径与 verify_requirement_baseline.py 一致（**误植即 FAIL**）：
   1. 比对双侧先经 test-script-lib/mdtable.py norm_quote 归一：空白单格化、Markdown 表格 `\|`
-     转义还原、全/半角标点与引号形制折叠——**表示法差异不再 FAIL，人零参与**；
-  2. 摘录字符缺失/误植但 行号指向正确 且 内容骨架（去空白去标点）可命中 →
-     自动按行号回读原文回填摘录（--autofix 时回写清单文件），留痕由报告工件自动
-     承载（auto_fixes 字段），**无需人工修复轮**；
-  3. 仅 行号指错（或骨架仍不命中）才 FAIL——那才是真正的定位问题。
+     转义还原、全/半角标点与引号形制折叠——表示法差异不算错；
+  2. norm(quote) 命中行区间文本 → PASS；不命中 → FAIL，报告 failures 记录
+     seq/file/lines/quote/error，交生成者按 extract_excerpt.py --by-line 输出重抄；
+  3. 默认不回读原文、不回填、不回写、不计自愈，产物零改动。
+
+--autofix 仅供维护者离线修复存量产物，机验管线 check.py 永不传该开关；
+带开关时回填摘录会做 Markdown 表格转义，并由报告 artifact_changed 留痕。
 
 这是机验引擎，必须保持零语义、确定性、可独立运行。
 
@@ -18,15 +20,17 @@ r"""verify_quotes.py — 引文逐字机验（溯源规范 V2：文件:行号 �
 
 行号写法：`596`（单行）或 `596-598`（行区间，摘录须在区间连接文本中命中）。
 
-用法：
-  python3 .opencode/skills/prd-record-spec/scripts/verify_quotes.py <引用表> --input-dir <资料目录>
+用法（<SKILLS_ROOT> 默认 ~/.config/opencode/skills，<WORKSPACE_ROOT> 由派发单注入；
+      命令发出前占位符须替换为实际绝对路径）：
+  python3 <SKILLS_ROOT>/prd-record-spec/scripts/verify_quotes.py \
+    <WORKSPACE_ROOT>/file/session-XXXXXX/output/tp/test-point.md \
+    --input-dir <WORKSPACE_ROOT>/file/project-docs
   加 --context 可在输出中打印每条引用的上下文行（供质检抽查断章风险）。
   加 --extract-from 可直接从 TP/TC 等清单文件抽取引用（语法 `文件名:L行号或区间「摘录」`），
   免于单独维护引用表——单一来源是清单文件本身。
-  加 --autofix 允许摘录自愈：回填修正经行号定位自原文件回读；源文件若为产物（不在
-  --input-dir 下）且旧摘录在文件中唯一 → 原位回写；否则仅在报告中留痕，不回写。
+  加 --autofix 且 --report 才允许离线回填并回写（回写前转义裸 |，禁用于机验管线）。
 
-退出码：0 = 全部命中（含自愈）；1 = 存在未命中；2 = 用法错误
+退出码：0 = 全部命中；1 = 存在未命中；2 = 用法错误
 """
 import argparse
 import hashlib
@@ -260,10 +264,13 @@ def main():
     parser.add_argument("--input-dir", required=True, nargs="+", help="资料目录（可传多个：文本资料目录 + 会话转换区，合并 解析/直引）")
     parser.add_argument("--context", action="store_true", help="输出每条引用的上下文行")
     parser.add_argument("--extract-from", action="store_true", help="从清单文件按 引用语法 直抽取引，不读表格/JSON")
-    parser.add_argument("--autofix", action="store_true", help="摘录自愈：行号正确且骨架命中时，回读原文回填摘录（源文件为产物且旧摘录唯一时原位回写），留痕由报告工件承载")
-    parser.add_argument("--report", default="", help="机验结果写 JSON 报告（含清单指纹），供质检按工件采信（2026-11-05 新增）")
+    parser.add_argument("--autofix", action="store_true", help="离线修复专用：行号正确且骨架命中时回读原文回填并回写；须与 --report 同用，机验管线禁用")
+    parser.add_argument("--report", default="", help="机验结果写 JSON 报告（含清单指纹），供质检按工件采信")
     args = parser.parse_args()
 
+    if args.autofix and not args.report:
+        print("用法错误: --autofix 为离线修复模式，必须同时提供 --report 留痕", file=sys.stderr)
+        return 2
     if not os.path.isfile(args.quotes):
         print(f"用法错误: 引用表不存在 {args.quotes}", file=sys.stderr)
         return 2
@@ -293,8 +300,12 @@ def main():
     _auto_fixes = []
     _resolved = []
 
+    def escape_md_cell(text):
+        """回填文本写入 Markdown 表格单元格前转义裸 | 并压平换行，避免切断表格行。"""
+        return re.sub(r"(?<!\\)\|", r"\|", text.replace("\r", " ").replace("\n", " "))
+
     def try_writeback(path, old, new):
-        """把回填后的摘录原位写回产物（仅当：旧摘录在文件中唯一且产物不在任一资料目录下）。"""
+        """把回填后的摘录原位写回产物（仅离线修复；旧摘录唯一且产物不在任一资料目录下）。"""
         nonlocal artifact_changed
         note = ""
         try:
@@ -308,9 +319,17 @@ def main():
             if count != 1:
                 note = f"skip: 旧摘录在源文件中出现 {count} 次，不唯一"
             else:
+                escaped = escape_md_cell(new)
+                replaced = content.replace(old, escaped)
+                before_line = next((ln for ln in content.splitlines() if old in ln), "")
+                after_line = next((ln for ln in replaced.splitlines() if escaped in ln), "")
+                if before_line.startswith("|") and not (
+                        after_line.startswith("|") and after_line.rstrip().endswith("|")):
+                    note = "skip: 替换后表格行形态被破坏，拒绝回写"
+                    return note
                 with open(path, "w", encoding="utf-8") as stream:
-                    stream.write(content.replace(old, new))
-                note = "written"
+                    stream.write(replaced)
+                note = "written(escaped)" if escaped != new else "written"
                 artifact_changed = True
         except OSError as exc:
             note = f"skip: 回写失败 ({exc})"
@@ -351,14 +370,13 @@ def main():
             haystack = norm(region)
             needle = norm(q["quote"])
             ok = bool(needle) and needle in haystack
-            if not ok:
-                # 自愈路径：行号正确 + 内容骨架命中 → 按行号回读原文回填摘录（表示法级偏差，非事实问题）
+            if not ok and args.autofix:
+                # 离线修复专用：行号正确 + 内容骨架命中 → 回读原文回填摘录并转义回写
+                # 默认机验路径不进入本分支，误植一律由下方 FAIL 分支裁决。
                 fixed = recover_slice(region, q["quote"])
                 if fixed and norm(fixed) in haystack:
                     old_quote, tag_auto = q["quote"], fixed[:24] + ("…" if len(fixed) > 24 else "")
-                    note = "report-only"
-                    if args.autofix:
-                        note = try_writeback(args.quotes, old_quote, fixed)
+                    note = try_writeback(args.quotes, old_quote, fixed)
                     q["quote"] = fixed
                     auto_fixed += 1
                     _auto_fixes.append({
@@ -367,7 +385,7 @@ def main():
                         "new_quote": fixed, "recovered_prefix": tag_auto,
                         "writeback": note,
                     })
-                    print(f"[AUTOFIX] 引用#{q['seq']} {rel}:{q['lines']} 摘录按行号自愈回填（回写: {note}）")
+                    print(f"[AUTOFIX] 引用#{q['seq']} {rel}:{q['lines']} 摘录按行号回填（离线模式，回写: {note}）")
                     ok = True
         except (RuntimeError, ValueError, OSError) as exc:
             print(f"FAIL 引用#{q['seq']} {rel}:{q['lines']} — {exc}")
@@ -388,7 +406,7 @@ def main():
             _report_failures.append({"seq": q["seq"], "file": rel, "lines": q["lines"], "quote": q["quote"], "error": "未在指定行命中"})
             failed += 1
 
-    print(f"========== 结论: PASS={passed} FAIL={failed} 自愈={auto_fixed} 总={passed + failed} ==========")
+    print(f"========== 结论: PASS={passed} FAIL={failed} 离线自愈={auto_fixed} 总={passed + failed} ==========")
 
     # 自愈回写会改动被检产物 → 指纹前后不一致，必须透明可见（否则报告指纹与磁盘对不上，
     # 下游会误判"机验后主件被改动"）。产物已变更时提示重跑全量。

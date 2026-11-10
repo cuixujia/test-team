@@ -4,12 +4,14 @@ description: 阶段 5/10 的分析方法工作法——方法选用与论域规�
 ---
 
 # 测试分析方法（衔接层）
+> **路径基准**：`<SKILLS_ROOT>` 默认 `~/.config/opencode/skills`（Linux 下由 shell 展开，换机器自动跟随 HOME），由派发单【路径基准】注入实际绝对路径；`<WORKSPACE_ROOT>` 为工作空间根目录绝对路径。本文中的脚本路径取 `<SKILLS_ROOT>/<skill>/scripts/...`，跨 skill 资源取 `<SKILLS_ROOT>/<skill>/references/...`，输入与产物取 `<WORKSPACE_ROOT>/file/session-XXXXXX/...`；命令发出前须替换为实际绝对路径，禁止相对路径与残留占位符。
+
 
 > 方法学的唯一权威在知识库 `test-knowledge`：
 > - **选什么方法** → 知识①《通用测试方法论》§7 方法选型决策指南（等价类/边界值/判定表/因果图/状态迁移/正交实验/场景法/错误推测/探索性测试）
 > - **方法怎么做** → 知识① §5 方法详解
 > - **每个维度测什么** → 知识③《通用测试规则》对应维度关注点
-> - **银行/Web/接口专项** → `test-knowledge/references/补充-领域检查单.md`
+> - **银行/Web/接口专项** → `<SKILLS_ROOT>/test-knowledge/references/补充-领域检查单.md`
 >
 > 本 skill 不复述方法学，只登记团队衔接规则：方法产出如何分配到 TP/TC。
 

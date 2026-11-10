@@ -2,7 +2,7 @@
 """convert_office.py — Office 材料入库前转换（唯一口径，见 SKILL.md）。
 
 将资料目录中的 .docx/.xlsx 转为同名 .md，落到 --output-dir（如
-<会话目录>/user-input-converted/）。转换是确定性映射，不做渲染猜测：
+<WORKSPACE_ROOT>/file/session-XXXXXX/user-input-converted/）。转换是确定性映射，不做渲染猜测：
 
 docx（zip 内 word/document.xml，OOXML）：
 - 标题样式/大纲级别 → `#` 层级；普通段落 → 原样一段（文字逐字保留）
@@ -23,7 +23,8 @@ xlsx（zip 内 xl/worksheets/*.xml + xl/sharedStrings.xml）：
 md 文件头登记来源注记（原件相对路径 + sha256）与转换丢弃清单。
 
 用法：
-  python3 convert_office.py --input-dir <资料目录> --output-dir <转换产物目录>
+  python3 <SKILLS_ROOT>/test-script-lib/scripts/convert_office.py \
+    --input-dir <资料目录绝对路径> --output-dir <WORKSPACE_ROOT>/file/session-XXXXXX/user-input-converted/
 
 退出码：0 = 全部处理完毕（含幂等跳过）；1 = 用法错误；2 = 有文件转换失败。
 """
